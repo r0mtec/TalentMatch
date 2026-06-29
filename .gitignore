@@ -1,0 +1,39 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Dependencies
+node_modules/
+vendor/
+backend/services/*/vendor/
+
+# Frontend build artifacts
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# Laravel runtime files
+**/storage/*.key
+**/storage/app/*
+!**/storage/app/.gitignore
+**/storage/framework/*
+!**/storage/framework/.gitignore
+**/storage/logs/*
+!**/storage/logs/.gitignore
+bootstrap/cache/*.php
+backend/services/*/bootstrap/cache/*.php
+
+# Logs and caches
+*.log
+.cache/
+.phpunit.result.cache
+
+# Docker/local overrides
+docker-compose.override.yml

@@ -1,0 +1,279 @@
+openapi: 3.1.0
+info:
+  title: TalentMatch API
+  version: 0.1.0
+  description: REST API skeleton for TalentMatch MVP.
+servers:
+  - url: http://localhost:8080/api
+    description: Local reverse proxy
+tags:
+  - name: Auth
+  - name: Requests
+  - name: Candidates
+  - name: Assessments
+  - name: Technologies
+  - name: Reports
+  - name: Internal
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Вход пользователя
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [login, password]
+              properties:
+                login: { type: string }
+                password: { type: string, format: password }
+      responses:
+        "200": { description: Token and user profile }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Выход пользователя
+      responses:
+        "200": { description: Logged out }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Текущий пользователь
+      responses:
+        "200": { description: User profile }
+  /requests:
+    get:
+      tags: [Requests]
+      summary: Список запросов
+      responses:
+        "200": { description: Requests list }
+    post:
+      tags: [Requests]
+      summary: Создать запрос заказчика
+      responses:
+        "201": { description: Created }
+  /requests/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Requests]
+      summary: Получить запрос
+      responses:
+        "200": { description: Request }
+    patch:
+      tags: [Requests]
+      summary: Обновить запрос
+      responses:
+        "200": { description: Updated }
+    delete:
+      tags: [Requests]
+      summary: Архивировать или удалить запрос
+      responses:
+        "200": { description: Deleted }
+  /requests/{id}/requirements:
+    post:
+      tags: [Requests]
+      summary: Добавить требование к запросу
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "201": { description: Created }
+  /requirements/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Requests]
+      summary: Обновить требование
+      responses:
+        "200": { description: Updated }
+    delete:
+      tags: [Requests]
+      summary: Удалить требование
+      responses:
+        "200": { description: Deleted }
+  /candidates:
+    get:
+      tags: [Candidates]
+      summary: Список кандидатов
+      responses:
+        "200": { description: Candidates list }
+  /candidates/upload:
+    post:
+      tags: [Candidates]
+      summary: Загрузить resume docx/pdf до 15 МБ
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [resume]
+              properties:
+                display_name: { type: string }
+                resume:
+                  type: string
+                  format: binary
+      responses:
+        "202": { description: Upload accepted }
+        "422": { description: Invalid file type or size }
+  /candidates/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Candidates]
+      summary: Карточка кандидата
+      responses:
+        "200": { description: Candidate }
+    patch:
+      tags: [Candidates]
+      summary: Ручная правка карточки кандидата
+      responses:
+        "200": { description: Updated }
+  /candidates/{id}/skills:
+    get:
+      tags: [Candidates]
+      summary: Навыки кандидата
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Skills list }
+    post:
+      tags: [Candidates]
+      summary: Ручное добавление навыка
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "201": { description: Created }
+  /candidate-skills/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Candidates]
+      summary: Редактировать навык кандидата
+      responses:
+        "200": { description: Updated }
+    delete:
+      tags: [Candidates]
+      summary: Удалить навык кандидата
+      responses:
+        "200": { description: Deleted }
+  /assessments:
+    post:
+      tags: [Assessments]
+      summary: Запустить сверку кандидата с запросом
+      responses:
+        "202": { description: Assessment started }
+  /assessments/{id}:
+    get:
+      tags: [Assessments]
+      summary: Результат сверки
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Assessment result }
+  /requests/{id}/assessments:
+    get:
+      tags: [Assessments]
+      summary: Результаты сверки по запросу
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Assessments list }
+  /requests/{id}/compare-candidates:
+    post:
+      tags: [Assessments]
+      summary: Сравнить кандидатов по запросу
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Comparison table }
+  /technologies:
+    get:
+      tags: [Technologies]
+      summary: Справочник технологий
+      responses:
+        "200": { description: Technologies list }
+    post:
+      tags: [Technologies]
+      summary: Создать технологию
+      responses:
+        "201": { description: Created }
+  /technologies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Technologies]
+      summary: Обновить технологию
+      responses:
+        "200": { description: Updated }
+    delete:
+      tags: [Technologies]
+      summary: Отключить технологию
+      responses:
+        "200": { description: Deleted }
+  /technologies/{id}/synonyms:
+    post:
+      tags: [Technologies]
+      summary: Добавить синоним технологии
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "201": { description: Created }
+  /technology-synonyms/{id}:
+    delete:
+      tags: [Technologies]
+      summary: Удалить синоним
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Deleted }
+  /assessments/{id}/report.pdf:
+    get:
+      tags: [Reports]
+      summary: PDF-отчет по assessment
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf: {}
+  /requests/{id}/comparison-report.pdf:
+    get:
+      tags: [Reports]
+      summary: PDF-отчет сравнения кандидатов
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf: {}
+  /internal/documents/parse:
+    post:
+      tags: [Internal]
+      summary: Internal document parser API
+      responses:
+        "200": { description: Parsed plain text and warnings }
+  /internal/skills/recognize:
+    post:
+      tags: [Internal]
+      summary: Internal skill recognition API
+      responses:
+        "200": { description: Skills and unrecognized terms }
+  /internal/assessments/calculate:
+    post:
+      tags: [Internal]
+      summary: Internal assessment calculation API
+      responses:
+        "200": { description: Coverage calculation result }
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
