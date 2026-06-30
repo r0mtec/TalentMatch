@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Support\RussianValidation;
 
 class AuthController extends Controller
 {
@@ -20,12 +21,12 @@ class AuthController extends Controller
         $credentials = $request->validate([
             'login' => ['required', 'string'],
             'password' => ['required', 'string'],
-        ]);
+        ], RussianValidation::messages(), RussianValidation::attributes());
 
         $user = User::where('login', $credentials['login'])->first();
 
         if (! $user || ! Hash::check($credentials['password'], $user->password_hash)) {
-            return response()->json(['message' => 'Invalid credentials.'], 401);
+            return response()->json(['message' => 'Неверный логин или пароль.'], 401);
         }
 
         $this->auditLog->log('auth.login', 'user', $user->id, [], $user->id);

@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\UsesRussianValidation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
 class StoreTechnologySynonymRequest extends FormRequest
 {
+    use UsesRussianValidation;
+
     public function authorize(): bool
     {
         return true;
@@ -21,7 +24,7 @@ class StoreTechnologySynonymRequest extends FormRequest
                 'max:255',
                 function (string $attribute, mixed $value, \Closure $fail): void {
                     if (\App\Models\TechnologySynonym::where('normalized_synonym', Str::lower($value))->exists()) {
-                        $fail('The synonym is already linked to a technology.');
+                        $fail('Этот синоним уже привязан к технологии.');
                     }
                 },
             ],

@@ -10,6 +10,7 @@ use App\Models\Candidate;
 use App\Models\CustomerRequest;
 use App\Services\AuditLogService;
 use App\Services\Internal\ReportClient;
+use App\Support\RussianValidation;
 use Illuminate\Http\Request;
 
 class AssessmentController extends Controller
@@ -69,7 +70,7 @@ class AssessmentController extends Controller
         $data = $httpRequest->validate([
             'candidate_ids' => ['required', 'array', 'min:1'],
             'candidate_ids.*' => ['uuid', 'exists:candidates,id'],
-        ]);
+        ], RussianValidation::messages(), RussianValidation::attributes());
 
         $items = Assessment::query()
             ->where('request_id', $request->id)

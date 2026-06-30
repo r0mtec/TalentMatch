@@ -8,6 +8,7 @@ use App\Http\Requests\StoreTechnologySynonymRequest;
 use App\Models\Technology;
 use App\Models\TechnologySynonym;
 use App\Services\AuditLogService;
+use App\Support\RussianValidation;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
@@ -44,7 +45,7 @@ class TechnologyController extends Controller
             'name' => ['sometimes', 'string', 'max:255', Rule::unique('technologies', 'name')->ignore($technology->id)],
             'group_name' => ['sometimes', 'string', 'max:100'],
             'is_active' => ['sometimes', 'boolean'],
-        ]));
+        ], RussianValidation::messages(), RussianValidation::attributes()));
 
         $this->auditLog->log('technology.updated', 'technology', $technology->id, [], $this->currentUserId());
 

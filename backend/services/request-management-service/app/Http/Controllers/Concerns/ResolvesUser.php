@@ -12,6 +12,6 @@ trait ResolvesUser
             return Auth::id();
         }
 
-        abort(response()->json(['message' => 'Unauthorized.'], 401));
+        abort(response()->json(['message' => 'Необходима авторизация.'], 401));
     }
 }

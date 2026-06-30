@@ -29,25 +29,25 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->render(function (AuthenticationException $e, Request $request) {
             return $request->is('api/*')
-                ? response()->json(['message' => 'Unauthenticated.'], 401)
+                ? response()->json(['message' => 'Необходима авторизация.'], 401)
                 : null;
         });
 
         $exceptions->render(function (AuthorizationException $e, Request $request) {
             return $request->is('api/*')
-                ? response()->json(['message' => 'Forbidden.'], 403)
+                ? response()->json(['message' => 'Доступ запрещен.'], 403)
                 : null;
         });
 
         $exceptions->render(function (ModelNotFoundException $e, Request $request) {
             return $request->is('api/*')
-                ? response()->json(['message' => 'Not found.'], 404)
+                ? response()->json(['message' => 'Запись не найдена.'], 404)
                 : null;
         });
 
         $exceptions->render(function (ValidationException $e, Request $request) {
             return $request->is('api/*')
-                ? response()->json(['message' => 'Validation failed.', 'errors' => $e->errors()], 422)
+                ? response()->json(['message' => 'Ошибка валидации.', 'errors' => $e->errors()], 422)
                 : null;
         });
     })->create();
