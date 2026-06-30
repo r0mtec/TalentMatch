@@ -1,0 +1,545 @@
+openapi: 3.1.0
+info:
+  title: TalentMatch API
+  version: 0.1.0
+  description: REST API skeleton for TalentMatch MVP.
+servers:
+  - url: http://localhost:8080/api
+    description: Local reverse proxy
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Requests
+  - name: Candidates
+  - name: Assessments
+  - name: Technologies
+  - name: Reports
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Вход пользователя
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Token and user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Выход пользователя
+      responses:
+        "200": { description: Logged out }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Текущий пользователь
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /requests:
+    get:
+      tags: [Requests]
+      summary: Список запросов
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: grade, in: query, schema: { type: string } }
+        - { name: created_from, in: query, schema: { type: string, format: date } }
+        - { name: created_to, in: query, schema: { type: string, format: date } }
+      responses:
+        "200":
+          description: Paginated requests list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/ServerError" }
+    post:
+      tags: [Requests]
+      summary: Создать запрос заказчика
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerRequestInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerRequest"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /requests/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Requests]
+      summary: Получить запрос с требованиями
+      responses:
+        "200": { description: Request with requirements }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Requests]
+      summary: Обновить запрос
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CustomerRequestInput"
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Requests]
+      summary: Архивировать запрос
+      responses:
+        "200": { description: Archived }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /requests/{id}/requirements:
+    post:
+      tags: [Requests]
+      summary: Добавить требование к запросу
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequirementInput"
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /requirements/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Requests]
+      summary: Обновить требование
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequirementInput"
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Requests]
+      summary: Удалить требование
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /candidates:
+    get:
+      tags: [Candidates]
+      summary: Список кандидатов
+      responses:
+        "200": { description: Paginated candidates list }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /candidates/upload:
+    post:
+      tags: [Candidates]
+      summary: Загрузить resume docx/pdf до 15 МБ
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [resume]
+              properties:
+                display_name: { type: string }
+                grade: { type: string, nullable: true }
+                location: { type: string, nullable: true }
+                citizenship: { type: string, nullable: true }
+                languages: { type: string, nullable: true }
+                resume:
+                  type: string
+                  format: binary
+      responses:
+        "202": { description: Upload accepted, candidate created, ParseResumeJob queued }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /candidates/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Candidates]
+      summary: Карточка кандидата с навыками
+      responses:
+        "200": { description: Candidate }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Candidates]
+      summary: Ручная правка карточки кандидата
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /candidates/{id}/skills:
+    get:
+      tags: [Candidates]
+      summary: Навыки кандидата
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Skills list }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Candidates]
+      summary: Ручное добавление навыка
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateSkillInput"
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /candidate-skills/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Candidates]
+      summary: Редактировать навык кандидата
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CandidateSkillInput"
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Candidates]
+      summary: Удалить навык кандидата
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /assessments:
+    post:
+      tags: [Assessments]
+      summary: Запустить сверку кандидата с запросом
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_id, candidate_id]
+              properties:
+                request_id: { type: string, format: uuid }
+                candidate_id: { type: string, format: uuid }
+      responses:
+        "202": { description: Assessment created; calculation queued or waiting for recognition }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /assessments/{id}:
+    get:
+      tags: [Assessments]
+      summary: Результат сверки
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Assessment result }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /requests/{id}/assessments:
+    get:
+      tags: [Assessments]
+      summary: Результаты сверки по запросу
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Assessments list }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /requests/{id}/compare-candidates:
+    post:
+      tags: [Assessments]
+      summary: Сравнить кандидатов по запросу
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [candidate_ids]
+              properties:
+                candidate_ids:
+                  type: array
+                  items: { type: string, format: uuid }
+      responses:
+        "200": { description: Comparison table }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /technologies:
+    get:
+      tags: [Technologies]
+      summary: Справочник технологий
+      parameters:
+        - { name: include_inactive, in: query, schema: { type: boolean } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200": { description: Technologies list }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Technologies]
+      summary: Создать технологию
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TechnologyInput"
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /technologies/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    patch:
+      tags: [Technologies]
+      summary: Обновить технологию
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TechnologyInput"
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Technologies]
+      summary: Отключить технологию
+      responses:
+        "200": { description: Disabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /technologies/{id}/synonyms:
+    post:
+      tags: [Technologies]
+      summary: Добавить синоним технологии
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [synonym]
+              properties:
+                synonym: { type: string }
+      responses:
+        "201": { description: Created }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /technology-synonyms/{id}:
+    delete:
+      tags: [Technologies]
+      summary: Удалить синоним
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /assessments/{id}/report.pdf:
+    get:
+      tags: [Reports]
+      summary: PDF-отчет по assessment
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /requests/{id}/comparison-report.pdf:
+    get:
+      tags: [Reports]
+      summary: PDF-отчет сравнения кандидатов
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque-token
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: Unauthorized
+    Forbidden:
+      description: Forbidden
+    NotFound:
+      description: Not found
+    ValidationError:
+      description: Validation error
+    ServerError:
+      description: Server error
+  schemas:
+    LoginRequest:
+      type: object
+      required: [login, password]
+      properties:
+        login: { type: string }
+        password: { type: string, format: password }
+    AuthResponse:
+      type: object
+      properties:
+        token_type: { type: string, example: Bearer }
+        token: { type: string }
+        user:
+          $ref: "#/components/schemas/User"
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        login: { type: string }
+        role: { type: string, enum: [account_manager, lead, admin] }
+    CustomerRequestInput:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        position: { type: string, nullable: true }
+        project_description: { type: string, nullable: true }
+        grade: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        citizenship: { type: string, nullable: true }
+        workload: { type: string, nullable: true }
+        start_date: { type: string, format: date, nullable: true }
+        status: { type: string, nullable: true }
+    CustomerRequest:
+      allOf:
+        - $ref: "#/components/schemas/CustomerRequestInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            created_by: { type: string, format: uuid }
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+    RequirementInput:
+      type: object
+      required: [type]
+      properties:
+        technology_id: { type: string, format: uuid, nullable: true }
+        raw_text: { type: string, nullable: true }
+        type: { type: string, enum: [must, nice] }
+        weight: { type: number, minimum: 0.01, nullable: true }
+    CandidateSkillInput:
+      type: object
+      required: [raw_text]
+      properties:
+        technology_id: { type: string, format: uuid, nullable: true }
+        raw_text: { type: string }
+        normalized_name: { type: string, nullable: true }
+        evidence_text: { type: string, nullable: true }
+        confidence: { type: integer, minimum: 0, maximum: 100, nullable: true }
+    TechnologyInput:
+      type: object
+      required: [name, group_name]
+      properties:
+        name: { type: string }
+        group_name: { type: string }
+        is_active: { type: boolean, nullable: true }
+    PaginatedResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items: {}
+        current_page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer }

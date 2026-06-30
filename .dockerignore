@@ -1,0 +1,9 @@
+.git
+.codex
+.agents
+node_modules
+vendor
+storage
+bootstrap/cache/*.php
+.env
+.DS_Store
