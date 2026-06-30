@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Technology extends Model
 {
@@ -12,4 +13,9 @@ class Technology extends Model
     protected $fillable = ['name', 'group_name', 'is_active'];
 
     protected $casts = ['is_active' => 'boolean'];
+
+    public function synonyms(): HasMany
+    {
+        return $this->hasMany(TechnologySynonym::class);
+    }
 }

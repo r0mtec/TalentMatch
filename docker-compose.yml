@@ -38,6 +38,7 @@ services:
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-true}
       APP_URL: ${APP_URL:-http://localhost:8080}
+      SESSION_DRIVER: file
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: ${DB_PORT:-5432}
@@ -45,6 +46,7 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-talentmatch}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       QUEUE_CONNECTION: redis
+      REDIS_CLIENT: predis
       REDIS_HOST: redis
       REDIS_PORT: ${REDIS_PORT:-6379}
       FILESYSTEM_DISK: s3
@@ -81,6 +83,7 @@ services:
       APP_NAME: TalentMatchQueueWorker
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY}
+      SESSION_DRIVER: file
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: ${DB_PORT:-5432}
@@ -88,6 +91,7 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-talentmatch}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       QUEUE_CONNECTION: redis
+      REDIS_CLIENT: predis
       REDIS_HOST: redis
       REDIS_PORT: ${REDIS_PORT:-6379}
       FILESYSTEM_DISK: s3
@@ -167,7 +171,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-talentmatch}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:

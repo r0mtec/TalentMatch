@@ -8,14 +8,16 @@ ARG INSTALL_PDF=false
 
 WORKDIR /app
 
-RUN composer create-project laravel/laravel . "^12.0" --no-interaction --no-dev --no-scripts --no-progress
+RUN composer create-project laravel/laravel . "^12.0" --no-interaction --no-install --no-scripts --no-progress \
+    && composer config platform.php 8.3.31 \
+    && composer install --no-interaction --no-dev --no-scripts --no-progress
 RUN rm -f database/migrations/*.php
 COPY ${SERVICE_PATH}/ /app/
 
-RUN if [ "$INSTALL_S3" = "true" ]; then composer require league/flysystem-aws-s3-v3 --no-interaction --no-dev --no-scripts --no-progress; fi \
-    && if [ "$INSTALL_REDIS" = "true" ]; then composer require predis/predis --no-interaction --no-dev --no-scripts --no-progress; fi \
-    && if [ "$INSTALL_PARSERS" = "true" ]; then composer require phpoffice/phpword smalot/pdfparser --no-interaction --no-dev --no-scripts --no-progress; fi \
-    && if [ "$INSTALL_PDF" = "true" ]; then composer require barryvdh/laravel-dompdf --no-interaction --no-dev --no-scripts --no-progress; fi \
+RUN if [ "$INSTALL_S3" = "true" ]; then composer require league/flysystem-aws-s3-v3 --no-interaction --no-scripts --no-progress --update-no-dev; fi \
+    && if [ "$INSTALL_REDIS" = "true" ]; then composer require predis/predis --no-interaction --no-scripts --no-progress --update-no-dev; fi \
+    && if [ "$INSTALL_PARSERS" = "true" ]; then composer require phpoffice/phpword smalot/pdfparser --no-interaction --no-scripts --no-progress --update-no-dev; fi \
+    && if [ "$INSTALL_PDF" = "true" ]; then composer require barryvdh/laravel-dompdf --no-interaction --no-scripts --no-progress --update-no-dev; fi \
     && composer dump-autoload --optimize --no-dev --no-scripts
 
 FROM php:8.3-cli-bookworm

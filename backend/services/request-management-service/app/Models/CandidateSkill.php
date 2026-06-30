@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\UsesUuid;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CandidateSkill extends Model
 {
@@ -20,4 +21,14 @@ class CandidateSkill extends Model
     ];
 
     protected $casts = ['is_manual' => 'boolean'];
+
+    public function candidate(): BelongsTo
+    {
+        return $this->belongsTo(Candidate::class);
+    }
+
+    public function technology(): BelongsTo
+    {
+        return $this->belongsTo(Technology::class);
+    }
 }

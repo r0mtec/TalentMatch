@@ -6,9 +6,11 @@ use Illuminate\Support\Str;
 
 trait UsesUuid
 {
-    public $incrementing = false;
-
-    protected $keyType = 'string';
+    public function initializeUsesUuid(): void
+    {
+        $this->incrementing = false;
+        $this->keyType = 'string';
+    }
 
     protected static function bootUsesUuid(): void
     {

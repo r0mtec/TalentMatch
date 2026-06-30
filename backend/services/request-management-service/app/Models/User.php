@@ -12,4 +12,9 @@ class User extends Authenticatable
     protected $fillable = ['login', 'password_hash', 'role'];
 
     protected $hidden = ['password_hash'];
+
+    public function getAuthPassword(): string
+    {
+        return $this->password_hash;
+    }
 }

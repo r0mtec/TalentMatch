@@ -2,7 +2,10 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 return new class extends Migration
 {
@@ -15,6 +18,26 @@ return new class extends Migration
             $table->string('role', 50)->index();
             $table->timestamps();
         });
+
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
+            $table->id();
+            $table->uuidMorphs('tokenable');
+            $table->string('name');
+            $table->string('token', 64)->unique();
+            $table->text('abilities')->nullable();
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamp('expires_at')->nullable();
+            $table->timestamps();
+        });
+
+        DB::table('users')->insert([
+            'id' => (string) Str::uuid(),
+            'login' => env('DEFAULT_ADMIN_LOGIN', 'admin'),
+            'password_hash' => Hash::make(env('DEFAULT_ADMIN_PASSWORD', 'password')),
+            'role' => 'admin',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         Schema::create('technologies', function (Blueprint $table) {
             $table->uuid('id')->primary();
@@ -52,9 +75,9 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('request_id')->constrained('requests')->cascadeOnDelete();
             $table->foreignUuid('technology_id')->nullable()->constrained('technologies')->nullOnDelete();
-            $table->text('raw_text');
+            $table->text('raw_text')->nullable();
             $table->string('type', 20)->index();
-            $table->unsignedInteger('weight')->default(1);
+            $table->decimal('weight', 8, 2)->default(1);
             $table->timestamps();
             $table->index('request_id');
             $table->index('technology_id');
@@ -167,6 +190,7 @@ return new class extends Migration
         Schema::dropIfExists('requests');
         Schema::dropIfExists('technology_synonyms');
         Schema::dropIfExists('technologies');
+        Schema::dropIfExists('personal_access_tokens');
         Schema::dropIfExists('users');
     }
 };

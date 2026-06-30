@@ -2,51 +2,98 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ResolvesUser;
+use App\Http\Requests\StoreAssessmentRequest;
+use App\Jobs\CalculateAssessmentJob;
+use App\Models\Assessment;
+use App\Models\Candidate;
+use App\Models\CustomerRequest;
+use App\Services\AuditLogService;
+use App\Services\Internal\ReportClient;
 use Illuminate\Http\Request;
 
 class AssessmentController extends Controller
 {
-    public function store(Request $request)
+    use ResolvesUser;
+
+    public function __construct(
+        private readonly AuditLogService $auditLog,
+        private readonly ReportClient $reportClient,
+    )
     {
-        return response()->json([
-            'id' => 'assessment-stub',
-            'status' => 'processing',
-            'request_id' => $request->input('request_id'),
-            'candidate_id' => $request->input('candidate_id'),
-        ], 202);
     }
 
-    public function show(string $id)
+    public function store(StoreAssessmentRequest $request)
     {
-        return response()->json([
-            'id' => $id,
-            'status' => 'done',
-            'total_score' => 86,
-            'must_score' => 80,
-            'nice_score' => 100,
-            'has_missing_must_requirements' => true,
-            'matched_requirements' => [],
-            'missing_requirements' => [],
+        $data = $request->validated();
+        $runNumber = ((int) Assessment::query()
+            ->where('request_id', $data['request_id'])
+            ->where('candidate_id', $data['candidate_id'])
+            ->max('run_number')) + 1;
+
+        $candidate = Candidate::findOrFail($data['candidate_id']);
+        $assessment = Assessment::create([
+            'request_id' => $data['request_id'],
+            'candidate_id' => $data['candidate_id'],
+            'run_number' => $runNumber,
+            'status' => $candidate->recognition_status === 'done' ? 'queued' : 'processing',
         ]);
+
+        if ($candidate->recognition_status === 'done') {
+            CalculateAssessmentJob::dispatch($assessment->id);
+        }
+
+        $this->auditLog->log('assessment.started', 'assessment', $assessment->id, [
+            'request_id' => $assessment->request_id,
+            'candidate_id' => $assessment->candidate_id,
+            'run_number' => $assessment->run_number,
+        ], $this->currentUserId());
+
+        return response()->json($assessment, 202);
     }
 
-    public function forRequest(string $request)
+    public function show(Assessment $assessment)
     {
-        return response()->json([['id' => 'assessment-stub', 'request_id' => $request, 'total_score' => 86]]);
+        return response()->json($assessment->load(['candidate', 'customerRequest', 'requirementResults.requirement.technology', 'requirementResults.matchedSkill']));
     }
 
-    public function compareCandidates(Request $request, string $requestId)
+    public function forRequest(CustomerRequest $request)
     {
-        return response()->json(['request_id' => $requestId, 'candidates' => $request->input('candidate_ids', []), 'items' => []]);
+        return response()->json(
+            $request->assessments()->with('candidate')->latest()->get()
+        );
     }
 
-    public function report(string $assessment)
+    public function compareCandidates(Request $httpRequest, CustomerRequest $request)
     {
-        return response('PDF report stub for assessment '.$assessment, 200)->header('Content-Type', 'application/pdf');
+        $data = $httpRequest->validate([
+            'candidate_ids' => ['required', 'array', 'min:1'],
+            'candidate_ids.*' => ['uuid', 'exists:candidates,id'],
+        ]);
+
+        $items = Assessment::query()
+            ->where('request_id', $request->id)
+            ->whereIn('candidate_id', $data['candidate_ids'])
+            ->with('candidate')
+            ->orderByDesc('run_number')
+            ->get()
+            ->unique('candidate_id')
+            ->values();
+
+        return response()->json(['request_id' => $request->id, 'items' => $items]);
     }
 
-    public function comparisonReport(string $request)
+    public function report(Assessment $assessment)
     {
-        return response('PDF comparison report stub for request '.$request, 200)->header('Content-Type', 'application/pdf');
+        $this->auditLog->log('assessment.report_exported', 'assessment', $assessment->id, [], $this->currentUserId());
+
+        return response($this->reportClient->assessmentPdf($assessment), 200)->header('Content-Type', 'application/pdf');
+    }
+
+    public function comparisonReport(CustomerRequest $request)
+    {
+        $this->auditLog->log('request.comparison_report_exported', 'request', $request->id, [], $this->currentUserId());
+
+        return response($this->reportClient->comparisonPdf($request), 200)->header('Content-Type', 'application/pdf');
     }
 }
