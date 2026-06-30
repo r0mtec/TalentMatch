@@ -30,6 +30,7 @@ return new class extends Migration
             $table->string('synonym');
             $table->string('normalized_synonym')->unique();
             $table->timestamps();
+            $table->index('technology_id');
         });
 
         Schema::create('requests', function (Blueprint $table) {
@@ -55,6 +56,8 @@ return new class extends Migration
             $table->string('type', 20)->index();
             $table->unsignedInteger('weight')->default(1);
             $table->timestamps();
+            $table->index('request_id');
+            $table->index('technology_id');
         });
 
         Schema::create('candidates', function (Blueprint $table) {
@@ -75,6 +78,7 @@ return new class extends Migration
             $table->foreignUuid('created_by')->constrained('users')->restrictOnDelete();
             $table->timestamps();
             $table->softDeletes();
+            $table->index('created_by');
         });
 
         Schema::create('candidate_skills', function (Blueprint $table) {
@@ -87,6 +91,9 @@ return new class extends Migration
             $table->unsignedTinyInteger('confidence')->default(100);
             $table->boolean('is_manual')->default(false);
             $table->timestamps();
+            $table->index('candidate_id');
+            $table->index('technology_id');
+            $table->index('normalized_name');
         });
 
         Schema::create('unrecognized_terms', function (Blueprint $table) {
@@ -96,12 +103,14 @@ return new class extends Migration
             $table->text('context')->nullable();
             $table->string('status', 50)->default('new')->index();
             $table->timestamps();
+            $table->index('candidate_id');
         });
 
         Schema::create('assessments', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('request_id')->constrained('requests')->cascadeOnDelete();
             $table->foreignUuid('candidate_id')->constrained('candidates')->cascadeOnDelete();
+            $table->unsignedInteger('run_number')->default(1);
             $table->decimal('must_score', 5, 2)->default(0);
             $table->decimal('nice_score', 5, 2)->default(0);
             $table->decimal('total_score', 5, 2)->default(0);
@@ -112,7 +121,10 @@ return new class extends Migration
             $table->string('status', 50)->default('processing')->index();
             $table->timestamp('calculated_at')->nullable();
             $table->timestamps();
-            $table->unique(['request_id', 'candidate_id']);
+            $table->index('request_id');
+            $table->index('candidate_id');
+            $table->index(['request_id', 'candidate_id', 'run_number']);
+            $table->index(['request_id', 'candidate_id', 'created_at']);
         });
 
         Schema::create('assessment_requirement_results', function (Blueprint $table) {
@@ -125,6 +137,9 @@ return new class extends Migration
             $table->decimal('score_contribution', 8, 2)->default(0);
             $table->text('comment')->nullable();
             $table->timestamps();
+            $table->index('assessment_id');
+            $table->index('requirement_id');
+            $table->index('matched_candidate_skill_id');
         });
 
         Schema::create('audit_logs', function (Blueprint $table) {
@@ -136,6 +151,7 @@ return new class extends Migration
             $table->json('metadata')->nullable();
             $table->string('correlation_id')->nullable()->index();
             $table->timestamps();
+            $table->index('user_id');
         });
     }
 
