@@ -459,15 +459,15 @@ components:
         format: uuid
   responses:
     Unauthorized:
-      description: Unauthorized
+      description: Необходима авторизация
     Forbidden:
-      description: Forbidden
+      description: Доступ запрещен
     NotFound:
-      description: Not found
+      description: Не найдено
     ValidationError:
-      description: Validation error
+      description: Ошибка валидации
     ServerError:
-      description: Server error
+      description: Ошибка сервера
   schemas:
     LoginRequest:
       type: object

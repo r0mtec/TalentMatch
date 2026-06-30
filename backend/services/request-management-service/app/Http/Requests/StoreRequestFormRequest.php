@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\UsesRussianValidation;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRequestFormRequest extends FormRequest
 {
+    use UsesRussianValidation;
+
     public function authorize(): bool
     {
         return true;

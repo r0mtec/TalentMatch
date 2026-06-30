@@ -9,6 +9,7 @@ use App\Models\Candidate;
 use App\Models\CandidateSkill;
 use App\Services\AuditLogService;
 use App\Services\ResumeUploadService;
+use App\Support\RussianValidation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
@@ -57,7 +58,7 @@ class CandidateController extends Controller
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'citizenship' => ['sometimes', 'nullable', 'string', 'max:255'],
             'languages' => ['sometimes', 'nullable', 'string'],
-        ]));
+        ], RussianValidation::messages(), RussianValidation::attributes()));
 
         return response()->json($candidate->refresh());
     }
@@ -88,7 +89,7 @@ class CandidateController extends Controller
             'normalized_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'evidence_text' => ['sometimes', 'nullable', 'string'],
             'confidence' => ['sometimes', 'integer', 'between:0,100'],
-        ]);
+        ], RussianValidation::messages(), RussianValidation::attributes());
         $data['normalized_name'] ??= isset($data['raw_text']) ? Str::lower($data['raw_text']) : $skill->normalized_name;
         $data['is_manual'] = true;
 

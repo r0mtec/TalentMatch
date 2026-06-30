@@ -16,7 +16,7 @@ class AuthenticateApiToken
         $plainToken = $request->bearerToken();
 
         if (! $plainToken) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return response()->json(['message' => 'Необходима авторизация.'], 401);
         }
 
         $token = DB::table('personal_access_tokens')
@@ -24,13 +24,13 @@ class AuthenticateApiToken
             ->first();
 
         if (! $token || ($token->expires_at && now()->greaterThan($token->expires_at))) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return response()->json(['message' => 'Необходима авторизация.'], 401);
         }
 
         $user = User::find($token->tokenable_id);
 
         if (! $user) {
-            return response()->json(['message' => 'Unauthenticated.'], 401);
+            return response()->json(['message' => 'Необходима авторизация.'], 401);
         }
 
         DB::table('personal_access_tokens')->where('id', $token->id)->update(['last_used_at' => now()]);

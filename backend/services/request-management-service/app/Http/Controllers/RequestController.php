@@ -9,6 +9,7 @@ use App\Http\Requests\UpdateRequestFormRequest;
 use App\Models\CustomerRequest;
 use App\Models\Requirement;
 use App\Services\AuditLogService;
+use App\Support\RussianValidation;
 use Illuminate\Http\Request;
 
 class RequestController extends Controller
@@ -85,10 +86,10 @@ class RequestController extends Controller
             'raw_text' => ['sometimes', 'nullable', 'string'],
             'type' => ['sometimes', 'in:must,nice'],
             'weight' => ['sometimes', 'numeric', 'min:0.01'],
-        ]);
+        ], RussianValidation::messages(), RussianValidation::attributes());
 
         if (($data['technology_id'] ?? $requirement->technology_id) === null && ($data['raw_text'] ?? $requirement->raw_text) === null) {
-            return response()->json(['message' => 'raw_text is required when technology_id is not provided.'], 422);
+            return response()->json(['message' => 'Текст требования обязателен, если технология не указана.'], 422);
         }
 
         $requirement->update($data);
