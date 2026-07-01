@@ -30,6 +30,7 @@ Route::middleware('auth.token')->group(function (): void {
     Route::get('/candidates/{candidate}', [CandidateController::class, 'show']);
     Route::get('/candidates/{candidate}/skills', [CandidateController::class, 'skills']);
     Route::post('/candidates/upload', [CandidateController::class, 'upload'])->middleware('role:account_manager,admin');
+    Route::post('/candidates/batch-upload', [CandidateController::class, 'batchUpload'])->middleware('role:account_manager,admin');
     Route::patch('/candidates/{candidate}', [CandidateController::class, 'update'])->middleware('role:account_manager,admin');
     Route::post('/candidates/{candidate}/skills', [CandidateController::class, 'storeSkill'])->middleware('role:account_manager,admin');
     Route::patch('/candidate-skills/{skill}', [CandidateController::class, 'updateSkill'])->middleware('role:account_manager,admin');
@@ -38,6 +39,7 @@ Route::middleware('auth.token')->group(function (): void {
     Route::post('/assessments', [AssessmentController::class, 'store'])->middleware('role:account_manager,admin');
     Route::get('/assessments/{assessment}', [AssessmentController::class, 'show']);
     Route::get('/requests/{request}/assessments', [AssessmentController::class, 'forRequest']);
+    Route::post('/requests/{request}/candidates/{candidate}/assessments', [AssessmentController::class, 'storeForRequest'])->middleware('role:account_manager,admin');
     Route::post('/requests/{request}/compare-candidates', [AssessmentController::class, 'compareCandidates']);
 
     Route::get('/technologies', [TechnologyController::class, 'index']);
@@ -45,7 +47,10 @@ Route::middleware('auth.token')->group(function (): void {
     Route::patch('/technologies/{technology}', [TechnologyController::class, 'update'])->middleware('role:admin');
     Route::delete('/technologies/{technology}', [TechnologyController::class, 'destroy'])->middleware('role:admin');
     Route::post('/technologies/{technology}/synonyms', [TechnologyController::class, 'storeSynonym'])->middleware('role:admin');
+    Route::patch('/technology-synonyms/{synonym}', [TechnologyController::class, 'updateSynonym'])->middleware('role:admin');
     Route::delete('/technology-synonyms/{synonym}', [TechnologyController::class, 'destroySynonym'])->middleware('role:admin');
+    Route::get('/unrecognized-terms', [TechnologyController::class, 'unrecognizedTerms'])->middleware('role:admin');
+    Route::post('/unrecognized-terms/{term}/promote', [TechnologyController::class, 'promoteUnrecognizedTerm'])->middleware('role:admin');
 
     Route::get('/assessments/{assessment}/report.pdf', [AssessmentController::class, 'report']);
     Route::get('/requests/{request}/comparison-report.pdf', [AssessmentController::class, 'comparisonReport']);

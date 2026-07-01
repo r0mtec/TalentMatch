@@ -26,6 +26,11 @@ class RecognizeCandidateSkillsJob implements ShouldQueue
         try {
             $result = $client->recognize($candidate);
 
+            CandidateSkill::query()
+                ->where('candidate_id', $candidate->id)
+                ->where('is_manual', false)
+                ->delete();
+
             foreach ($result['skills'] ?? [] as $skill) {
                 CandidateSkill::create([
                     'candidate_id' => $candidate->id,
@@ -39,15 +44,38 @@ class RecognizeCandidateSkillsJob implements ShouldQueue
             }
 
             foreach ($result['unrecognized_terms'] ?? [] as $term) {
+                $termText = trim((string) ($term['term'] ?? $term));
+
+                if ($termText === '') {
+                    continue;
+                }
+
+                $exists = UnrecognizedTerm::query()
+                    ->where('candidate_id', $candidate->id)
+                    ->where('term', $termText)
+                    ->where('status', 'new')
+                    ->exists();
+
+                if ($exists) {
+                    continue;
+                }
+
                 UnrecognizedTerm::create([
                     'candidate_id' => $candidate->id,
-                    'term' => $term['term'] ?? $term,
+                    'term' => $termText,
                     'context' => is_array($term) ? ($term['context'] ?? null) : null,
                     'status' => 'new',
                 ]);
             }
 
             $candidate->update(['recognition_status' => 'done']);
+
+            $candidate->assessments()
+                ->where('status', 'processing')
+                ->each(function ($assessment): void {
+                    $assessment->update(['status' => 'queued']);
+                    CalculateAssessmentJob::dispatch($assessment->id);
+                });
         } catch (\Throwable $exception) {
             $candidate->update(['recognition_status' => 'failed']);
 

@@ -52,6 +52,11 @@
 - `GET /api/assessments/{id}`
 - `GET /api/technologies`
 - `POST /api/technologies`
+- `PATCH /api/technologies/{id}`
+- `DELETE /api/technologies/{id}`
+- `POST /api/technologies/{id}/synonyms`
+- `PATCH /api/technology-synonyms/{id}`
+- `DELETE /api/technology-synonyms/{id}`
 - `GET /api/assessments/{id}/report.pdf`
 
 ## Health endpoints
@@ -75,19 +80,11 @@ database/migrations/2026_01_01_000001_create_talentmatch_core_tables.php
 - `Candidate`
 - `CandidateSkill`
 - `Technology`
+- `TechnologySynonym`
 - `Assessment`
 - `AssessmentRequirementResult`
 
 ## Текущее состояние
 
-Сервис сейчас является каркасом. Контроллеры возвращают stub/mock responses, а не полную бизнес-логику.
+Сервис реализует основные backend-сценарии через PostgreSQL, Redis Queue, MinIO и внутренние HTTP-сервисы. Справочник технологий и синонимов хранится в БД; `skill-recognition-service` получает его из `request-management-service` при распознавании.
 
-## Что нужно реализовать дальше
-
-- настоящую авторизацию и RBAC;
-- сохранение запросов, требований, кандидатов и навыков через Eloquent;
-- загрузку файлов в MinIO через Laravel Storage;
-- постановку задач парсинга в Redis Queue;
-- orchestration пайплайна `upload -> parse -> recognize -> assess`;
-- получение реальных отчетов из `report-service`;
-- аудит действий пользователей.

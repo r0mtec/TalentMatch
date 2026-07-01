@@ -10,11 +10,13 @@ security:
   - bearerAuth: []
 tags:
   - name: Auth
+  - name: Users
   - name: Requests
   - name: Candidates
   - name: Assessments
   - name: Technologies
   - name: Reports
+  - name: Internal
 
 paths:
   /auth/login:
@@ -57,6 +59,92 @@ paths:
                 $ref: "#/components/schemas/User"
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /users:
+    get:
+      tags: [Users]
+      summary: Список пользователей
+      description: Доступно только пользователю с ролью admin.
+      parameters:
+        - { name: role, in: query, schema: { type: string, enum: [account_manager, lead, admin] } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Paginated users list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedResponse"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Users]
+      summary: Создать пользователя
+      description: Доступно только пользователю с ролью admin.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+  /users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/Id"
+    get:
+      tags: [Users]
+      summary: Получить пользователя
+      description: Доступно только пользователю с ролью admin.
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Users]
+      summary: Обновить пользователя
+      description: Доступно только пользователю с ролью admin.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdateInput"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Users]
+      summary: Удалить пользователя
+      description: Доступно только пользователю с ролью admin. Удаление не выполняется для текущего пользователя, последнего администратора или пользователя со связанными запросами/кандидатами.
+      responses:
+        "200": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
   /requests:
     get:
       tags: [Requests]
@@ -64,6 +152,7 @@ paths:
       parameters:
         - { name: status, in: query, schema: { type: string } }
         - { name: grade, in: query, schema: { type: string } }
+        - { name: q, in: query, description: Поиск по title/position/project_description, schema: { type: string } }
         - { name: created_from, in: query, schema: { type: string, format: date } }
         - { name: created_to, in: query, schema: { type: string, format: date } }
       responses:
@@ -169,6 +258,16 @@ paths:
     get:
       tags: [Candidates]
       summary: Список кандидатов
+      parameters:
+        - { name: q, in: query, description: Поиск по display_name/original_file_name/parsed_text, schema: { type: string } }
+        - { name: technology_id, in: query, schema: { type: string, format: uuid } }
+        - { name: technology_ids[], in: query, schema: { type: array, items: { type: string, format: uuid } } }
+        - { name: grade, in: query, schema: { type: string } }
+        - { name: location, in: query, schema: { type: string } }
+        - { name: parsing_status, in: query, schema: { type: string, enum: [uploaded, processing, parsed, failed] } }
+        - { name: recognition_status, in: query, schema: { type: string, enum: [pending, processing, done, failed] } }
+        - { name: created_from, in: query, schema: { type: string, format: date } }
+        - { name: created_to, in: query, schema: { type: string, format: date } }
       responses:
         "200": { description: Paginated candidates list }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -197,6 +296,33 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "422": { $ref: "#/components/responses/ValidationError" }
         "500": { $ref: "#/components/responses/ServerError" }
+  /candidates/batch-upload:
+    post:
+      tags: [Candidates]
+      summary: Пакетно загрузить resume docx/pdf до 15 МБ каждое
+      description: Возвращает 202 с созданными кандидатами и ошибками по отдельным файлам. При request_id создаёт assessment run для каждого успешно загруженного кандидата.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [resumes]
+              properties:
+                request_id: { type: string, format: uuid, nullable: true }
+                grade: { type: string, nullable: true }
+                location: { type: string, nullable: true }
+                citizenship: { type: string, nullable: true }
+                languages: { type: string, nullable: true }
+                resumes:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+      responses:
+        "202": { description: Batch upload accepted with per-file results }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
   /candidates/{id}:
     parameters:
       - $ref: "#/components/parameters/Id"
@@ -299,8 +425,22 @@ paths:
       summary: Результаты сверки по запросу
       parameters:
         - $ref: "#/components/parameters/Id"
+        - { name: sort, in: query, schema: { type: string, enum: [total_score_desc, total_score_asc, must_score_desc, created_at_desc], default: created_at_desc } }
+        - { name: status, in: query, schema: { type: string, enum: [queued, processing, done, failed] } }
       responses:
         "200": { description: Assessments list }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /requests/{id}/candidates/{candidate_id}/assessments:
+    post:
+      tags: [Assessments]
+      summary: Повторно прогнать ранее загруженного кандидата против запроса
+      description: Не копирует кандидата и не требует повторную загрузку файла. Создаёт новый assessment run_number; если recognition_status не done, расчёт будет поставлен после распознавания.
+      parameters:
+        - $ref: "#/components/parameters/Id"
+        - { name: candidate_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "202": { description: Assessment created; calculation queued or waiting for recognition }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /requests/{id}/compare-candidates:
@@ -321,7 +461,7 @@ paths:
                   type: array
                   items: { type: string, format: uuid }
       responses:
-        "200": { description: Comparison table }
+        "200": { description: Comparison table sorted by total_score desc }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationError" }
@@ -397,6 +537,26 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
         "422": { $ref: "#/components/responses/ValidationError" }
   /technology-synonyms/{id}:
+    patch:
+      tags: [Technologies]
+      summary: Изменить синоним
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [synonym]
+              properties:
+                synonym: { type: string }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "422": { $ref: "#/components/responses/ValidationError" }
     delete:
       tags: [Technologies]
       summary: Удалить синоним
@@ -424,6 +584,41 @@ paths:
                 format: binary
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+
+  /unrecognized-terms:
+    get:
+      tags: [Technologies]
+      summary: Список нераспознанных терминов
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [new, processed, linked] } }
+      responses:
+        "200": { description: Paginated unrecognized terms list }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /unrecognized-terms/{id}/promote:
+    post:
+      tags: [Technologies]
+      summary: Создать технологию из нераспознанного термина
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, group_name]
+              properties:
+                name: { type: string }
+                group_name: { type: string, enum: [languages, frameworks, databases, infrastructure, other] }
+                synonyms:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201": { description: Technology created and term marked processed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
         "500": { $ref: "#/components/responses/ServerError" }
   /requests/{id}/comparison-report.pdf:
     get:
@@ -441,6 +636,109 @@ paths:
                 format: binary
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/ServerError" }
+
+  /internal/documents/parse:
+    post:
+      tags: [Internal]
+      summary: Internal: извлечь plain_text из resume-файла
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalDocumentParseRequest"
+      responses:
+        "200":
+          description: Parse result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalDocumentParseResponse"
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /internal/skills/recognize:
+    post:
+      tags: [Internal]
+      summary: Internal: распознать навыки по plain_text
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalSkillRecognizeRequest"
+      responses:
+        "200":
+          description: Recognition result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalSkillRecognizeResponse"
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /internal/assessments/calculate:
+    post:
+      tags: [Internal]
+      summary: Internal: рассчитать покрытие требований навыками кандидата
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalAssessmentCalculateRequest"
+      responses:
+        "200":
+          description: Assessment calculation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InternalAssessmentCalculateResponse"
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /internal/reports/assessment:
+    post:
+      tags: [Internal]
+      summary: Internal: сформировать PDF-отчет по assessment
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalAssessmentReportRequest"
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "422": { $ref: "#/components/responses/ValidationError" }
+        "500": { $ref: "#/components/responses/ServerError" }
+  /internal/reports/comparison:
+    post:
+      tags: [Internal]
+      summary: Internal: сформировать PDF-отчет сравнения кандидатов
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InternalComparisonReportRequest"
+      responses:
+        "200":
+          description: PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "422": { $ref: "#/components/responses/ValidationError" }
         "500": { $ref: "#/components/responses/ServerError" }
 
 components:
@@ -462,6 +760,8 @@ components:
       description: Необходима авторизация
     Forbidden:
       description: Доступ запрещен
+    Conflict:
+      description: Операция конфликтует с текущим состоянием данных
     NotFound:
       description: Не найдено
     ValidationError:
@@ -488,11 +788,24 @@ components:
         id: { type: string, format: uuid }
         login: { type: string }
         role: { type: string, enum: [account_manager, lead, admin] }
+    UserCreateInput:
+      type: object
+      required: [login, password, role]
+      properties:
+        login: { type: string, maxLength: 255 }
+        password: { type: string, format: password, minLength: 8, maxLength: 255 }
+        role: { type: string, enum: [account_manager, lead, admin] }
+    UserUpdateInput:
+      type: object
+      properties:
+        login: { type: string, maxLength: 255 }
+        password: { type: string, format: password, minLength: 8, maxLength: 255 }
+        role: { type: string, enum: [account_manager, lead, admin] }
     CustomerRequestInput:
       type: object
-      required: [title]
+      description: "Для status=draft допускается минимальный payload без title/position/project_description/grade/location/citizenship/workload/start_date. Для status=active backend требует title, position и хотя бы одно требование у запроса. Допустимые статусы: draft, active, closed, archived."
       properties:
-        title: { type: string }
+        title: { type: string, nullable: true }
         position: { type: string, nullable: true }
         project_description: { type: string, nullable: true }
         grade: { type: string, nullable: true }
@@ -500,7 +813,7 @@ components:
         citizenship: { type: string, nullable: true }
         workload: { type: string, nullable: true }
         start_date: { type: string, format: date, nullable: true }
-        status: { type: string, nullable: true }
+        status: { type: string, enum: [draft, active, closed, archived], nullable: true, default: draft }
     CustomerRequest:
       allOf:
         - $ref: "#/components/schemas/CustomerRequestInput"
@@ -532,8 +845,221 @@ components:
       required: [name, group_name]
       properties:
         name: { type: string }
-        group_name: { type: string }
+        group_name: { type: string, enum: [languages, frameworks, databases, infrastructure, other] }
         is_active: { type: boolean, nullable: true }
+    InternalDocumentParseRequest:
+      type: object
+      required: [candidate_id, file_storage_key, file_mime_type, original_file_name]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        file_storage_key: { type: string, example: resumes/candidate.pdf }
+        file_mime_type: { type: string, example: application/pdf }
+        original_file_name: { type: string, example: resume.pdf }
+    InternalDocumentParseResponse:
+      type: object
+      required: [candidate_id, status, plain_text, warnings]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        status: { type: string, enum: [parsed, failed] }
+        plain_text: { type: string, nullable: true }
+        sections:
+          type: object
+          properties:
+            skills: { type: string, nullable: true }
+            technologies: { type: string, nullable: true }
+            projects: { type: string, nullable: true }
+            experience: { type: string, nullable: true }
+            grade: { type: string, nullable: true }
+            location: { type: string, nullable: true }
+            languages: { type: string, nullable: true }
+        warnings:
+          type: array
+          items: { type: string }
+    InternalSkillRecognizeRequest:
+      type: object
+      required: [candidate_id, plain_text, technologies]
+      properties:
+        candidate_id: { type: string, format: uuid }
+        plain_text: { type: string }
+        technologies:
+          type: array
+          items:
+            type: object
+            required: [id, name]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              group_name: { type: string, enum: [languages, frameworks, databases, infrastructure, other], nullable: true }
+              synonyms:
+                type: array
+                items: { type: string }
+    InternalRecognizedSkill:
+      type: object
+      required: [normalized_name, raw_text]
+      properties:
+        technology_id: { type: string, format: uuid, nullable: true }
+        normalized_name: { type: string }
+        raw_text: { type: string }
+        evidence_text: { type: string, nullable: true }
+        confidence: { type: integer, minimum: 0, maximum: 100 }
+    InternalSkillRecognizeResponse:
+      type: object
+      required: [status, skills, unrecognized_terms]
+      properties:
+        status: { type: string, enum: [done, failed] }
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalRecognizedSkill"
+        unrecognized_terms:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: object
+                properties:
+                  term: { type: string }
+                  context: { type: string, nullable: true }
+    InternalAssessmentRequirement:
+      type: object
+      required: [id, type, weight, technology_id, raw_text, normalized_name]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [must, nice] }
+        weight: { type: number }
+        technology_id: { type: string, format: uuid, nullable: true }
+        raw_text: { type: string, nullable: true }
+        normalized_name: { type: string, nullable: true }
+    InternalAssessmentSkill:
+      type: object
+      required: [id, technology_id, normalized_name, raw_text, evidence_text]
+      properties:
+        id: { type: string, format: uuid }
+        technology_id: { type: string, format: uuid, nullable: true }
+        normalized_name: { type: string }
+        raw_text: { type: string }
+        evidence_text: { type: string, nullable: true }
+    InternalAssessmentCalculateRequest:
+      type: object
+      required: [assessment_id, requirements, skills]
+      properties:
+        assessment_id: { type: string, format: uuid }
+        requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalAssessmentRequirement"
+        skills:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalAssessmentSkill"
+        conditions:
+          $ref: "#/components/schemas/InternalAssessmentConditions"
+    InternalAssessmentConditions:
+      type: object
+      properties:
+        request_grade: { type: string, nullable: true }
+        candidate_grade: { type: string, nullable: true }
+        request_location: { type: string, nullable: true }
+        candidate_location: { type: string, nullable: true }
+        request_citizenship: { type: string, nullable: true }
+        candidate_citizenship: { type: string, nullable: true }
+    InternalAssessmentRequirementResult:
+      type: object
+      required: [requirement_id, is_matched, score_contribution]
+      properties:
+        requirement_id: { type: string, format: uuid }
+        matched_candidate_skill_id: { type: string, format: uuid, nullable: true }
+        is_matched: { type: boolean }
+        evidence_text: { type: string, nullable: true }
+        score_contribution: { type: number }
+        comment: { type: string, nullable: true }
+    InternalAssessmentCalculateResponse:
+      type: object
+      required: [status, must_score, nice_score, total_score, has_missing_must_requirements, requirement_results]
+      properties:
+        status: { type: string, enum: [done, failed] }
+        must_score: { type: number }
+        nice_score: { type: number }
+        total_score: { type: number }
+        has_missing_must_requirements: { type: boolean }
+        grade_match_status: { type: string, enum: [matches, does_not_match, unknown] }
+        location_match_status: { type: string, enum: [matches, does_not_match, unknown] }
+        citizenship_match_status: { type: string, enum: [matches, does_not_match, unknown] }
+        requirement_results:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalAssessmentRequirementResult"
+    InternalReportRequestSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid, nullable: true }
+        title: { type: string, nullable: true }
+        position: { type: string, nullable: true }
+        grade: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        citizenship: { type: string, nullable: true }
+        status: { type: string, nullable: true }
+    InternalReportCandidateSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid, nullable: true }
+        display_name: { type: string, nullable: true }
+        grade: { type: string, nullable: true }
+        location: { type: string, nullable: true }
+        citizenship: { type: string, nullable: true }
+        languages: { type: string, nullable: true }
+    InternalReportRequirementResult:
+      type: object
+      properties:
+        requirement_id: { type: string, format: uuid }
+        requirement_type: { type: string, enum: [must, nice], nullable: true }
+        requirement_weight: { type: number, nullable: true }
+        requirement_text: { type: string, nullable: true }
+        matched_candidate_skill_id: { type: string, format: uuid, nullable: true }
+        matched_skill: { type: string, nullable: true }
+        is_matched: { type: boolean }
+        evidence_text: { type: string, nullable: true }
+        score_contribution: { type: number }
+        comment: { type: string, nullable: true }
+    InternalReportAssessment:
+      type: object
+      required: [id, request, candidate, requirement_results]
+      properties:
+        id: { type: string, format: uuid }
+        run_number: { type: integer, nullable: true }
+        status: { type: string, nullable: true }
+        must_score: { type: number }
+        nice_score: { type: number }
+        total_score: { type: number }
+        has_missing_must_requirements: { type: boolean }
+        grade_match_status: { type: string, enum: [matches, does_not_match, unknown], nullable: true }
+        location_match_status: { type: string, enum: [matches, does_not_match, unknown], nullable: true }
+        citizenship_match_status: { type: string, enum: [matches, does_not_match, unknown], nullable: true }
+        calculated_at: { type: string, format: date-time, nullable: true }
+        request:
+          $ref: "#/components/schemas/InternalReportRequestSummary"
+        candidate:
+          $ref: "#/components/schemas/InternalReportCandidateSummary"
+        requirement_results:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalReportRequirementResult"
+    InternalAssessmentReportRequest:
+      type: object
+      required: [assessment]
+      properties:
+        assessment:
+          $ref: "#/components/schemas/InternalReportAssessment"
+    InternalComparisonReportRequest:
+      type: object
+      required: [request, assessments]
+      properties:
+        request:
+          $ref: "#/components/schemas/InternalReportRequestSummary"
+        assessments:
+          type: array
+          items:
+            $ref: "#/components/schemas/InternalReportAssessment"
     PaginatedResponse:
       type: object
       properties:
