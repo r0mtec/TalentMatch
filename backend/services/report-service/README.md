@@ -34,15 +34,22 @@
 - данные assessment из `request-management-service` или PostgreSQL;
 - PDF-библиотека, например `barryvdh/laravel-dompdf`.
 
-## Текущее состояние
+## Реализация
 
-Сервис сейчас возвращает PDF stub response. Реальная генерация PDF еще не реализована.
+Сервис принимает уже подготовленные данные из `request-management-service` и генерирует PDF из простого HTML через `barryvdh/laravel-dompdf`.
 
-## Что нужно реализовать дальше
+Сервис не читает БД, не считает assessment, не парсит резюме и не распознает навыки.
 
-- HTML-шаблоны отчетов;
-- генерацию PDF через выбранную библиотеку;
-- корректный `Content-Type: application/pdf`;
-- имя файла для скачивания;
-- обработку отсутствующих assessment;
-- единый визуальный формат отчета для отправки заказчику.
+PDF assessment report содержит:
+
+- запрос;
+- кандидата;
+- `total_score`;
+- `must_score`;
+- `nice_score`;
+- закрытые требования;
+- отсутствующие требования;
+- `evidence_text`.
+
+PDF comparison report содержит таблицу последних assessment по кандидатам одного request.
+

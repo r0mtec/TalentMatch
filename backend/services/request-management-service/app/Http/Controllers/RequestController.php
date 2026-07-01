@@ -11,6 +11,7 @@ use App\Models\Requirement;
 use App\Services\AuditLogService;
 use App\Support\RussianValidation;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 
 class RequestController extends Controller
 {
@@ -28,6 +29,14 @@ class RequestController extends Controller
         $query->when($request->filled('grade'), fn ($q) => $q->where('grade', $request->string('grade')));
         $query->when($request->filled('created_from'), fn ($q) => $q->whereDate('created_at', '>=', $request->date('created_from')));
         $query->when($request->filled('created_to'), fn ($q) => $q->whereDate('created_at', '<=', $request->date('created_to')));
+        $query->when($request->filled('q'), function ($q) use ($request): void {
+            $term = '%'.$request->input('q').'%';
+            $q->where(function ($nested) use ($term): void {
+                $nested->where('title', 'ilike', $term)
+                    ->orWhere('position', 'ilike', $term)
+                    ->orWhere('project_description', 'ilike', $term);
+            });
+        });
 
         return response()->json($query->paginate($request->integer('per_page', 25)));
     }
@@ -38,6 +47,12 @@ class RequestController extends Controller
             'created_by' => $this->currentUserId(),
             'status' => $request->input('status', 'draft'),
         ]);
+
+        if ($error = $this->activeValidationError($customerRequest)) {
+            $customerRequest->delete();
+
+            return $error;
+        }
 
         $this->auditLog->log('request.created', 'request', $customerRequest->id, [], $customerRequest->created_by);
 
@@ -51,7 +66,13 @@ class RequestController extends Controller
 
     public function update(UpdateRequestFormRequest $httpRequest, CustomerRequest $request)
     {
-        $request->update($httpRequest->validated());
+        $data = $httpRequest->validated();
+
+        if ($error = $this->activeValidationError($request, $data)) {
+            return $error;
+        }
+
+        $request->update($data);
 
         $this->auditLog->log('request.updated', 'request', $request->id, [], $this->currentUserId());
 
@@ -107,5 +128,31 @@ class RequestController extends Controller
         $this->auditLog->log('requirement.deleted', 'requirement', $id, [], $this->currentUserId());
 
         return response()->json(['id' => $id, 'deleted' => true]);
+    }
+
+    private function activeValidationError(CustomerRequest $request, array $changes = []): ?JsonResponse
+    {
+        $status = $changes['status'] ?? $request->status;
+
+        if ($status !== 'active') {
+            return null;
+        }
+
+        $errors = [];
+
+        foreach (['title', 'position'] as $field) {
+            if (blank($changes[$field] ?? $request->{$field})) {
+                $errors[$field][] = 'Поле обязательно для активного запроса.';
+            }
+        }
+
+        if ($request->requirements()->count() === 0) {
+            $errors['requirements'][] = 'Для активного запроса нужно добавить хотя бы одно требование.';
+        }
+
+        return $errors === [] ? null : response()->json([
+            'message' => 'Запрос нельзя перевести в рабочий статус без обязательных данных.',
+            'errors' => $errors,
+        ], 422);
     }
 }

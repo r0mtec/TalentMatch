@@ -28,7 +28,7 @@ docker compose up --build
 - assessment-service: http://localhost:8003
 - report-service: http://localhost:8004
 - MinIO console: http://localhost:9001
-- PostgreSQL: `localhost:5432`, параметры берутся из `.env`
+- PostgreSQL: `localhost:${POSTGRES_HOST_PORT:-5432}`, параметры берутся из `.env`
 
 MinIO credentials и bucket также берутся из `.env`:
 
@@ -50,7 +50,7 @@ AWS_BUCKET=...
 - `report-service` - внутренний Laravel API для PDF-отчетов.
 - `postgres` - основная база данных.
 - `minio` и `minio-init` - S3-compatible файловое хранилище и создание bucket `resumes`.
-- `redis` - очередь и простой кэш.
+- `redis` - очередь фоновых задач.
 
 ## Документация
 
@@ -58,6 +58,7 @@ AWS_BUCKET=...
 - OpenAPI: [docs/openapi/talentmatch.openapi.yml](docs/openapi/talentmatch.openapi.yml)
 - Сущности БД: [docs/database_entities.md](docs/database_entities.md)
 - Диаграмма БД: [docs/database_schema.puml](docs/database_schema.puml)
+- Backend tests: [docs/backend-testing.md](docs/backend-testing.md)
 
 ## Миграции
 
@@ -73,6 +74,12 @@ backend/services/request-management-service/database/migrations/2026_01_01_00000
 docker compose exec request-management-service php artisan migrate
 ```
 
+Проверить состояние миграций:
+
+```bash
+docker compose exec request-management-service php artisan migrate:status
+```
+
 ## Проверка health endpoints
 
 ```bash
@@ -83,4 +90,13 @@ curl http://localhost:8003/health
 curl http://localhost:8004/health
 ```
 
-Endpoints пока возвращают stub/mock responses. Это ожидаемо: цель текущего этапа - каркас, контракты, схема данных и точки расширения, а не полная бизнес-логика.
+Ready endpoints:
+
+```bash
+curl http://localhost:8000/ready
+curl http://localhost:8001/ready
+curl http://localhost:8002/ready
+curl http://localhost:8003/ready
+curl http://localhost:8004/ready
+```
+

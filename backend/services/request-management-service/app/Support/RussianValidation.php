@@ -66,6 +66,7 @@ class RussianValidation
             'raw_text' => 'текст требования',
             'request_id' => 'запрос',
             'resume' => 'резюме',
+            'role' => 'роль',
             'start_date' => 'дата старта',
             'status' => 'статус',
             'synonym' => 'синоним',

@@ -30,6 +30,7 @@ services:
       dockerfile: backend/docker/laravel/Dockerfile
       args:
         SERVICE_PATH: backend/services/request-management-service
+        SERVICE_APP_NAME: TalentMatchRequestManagement
         INSTALL_S3: "true"
         INSTALL_REDIS: "true"
     environment:
@@ -39,6 +40,7 @@ services:
       APP_DEBUG: ${APP_DEBUG:-true}
       APP_URL: ${APP_URL:-http://localhost:8080}
       SESSION_DRIVER: file
+      CACHE_STORE: file
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: ${DB_PORT:-5432}
@@ -76,14 +78,16 @@ services:
       dockerfile: backend/docker/laravel/Dockerfile
       args:
         SERVICE_PATH: backend/services/request-management-service
+        SERVICE_APP_NAME: TalentMatchRequestManagement
         INSTALL_S3: "true"
         INSTALL_REDIS: "true"
     command: php artisan queue:work --tries=3 --timeout=30
     environment:
-      APP_NAME: TalentMatchQueueWorker
+      APP_NAME: TalentMatchRequestManagement
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY}
       SESSION_DRIVER: file
+      CACHE_STORE: file
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: ${DB_PORT:-5432}
@@ -111,15 +115,29 @@ services:
       dockerfile: backend/docker/laravel/Dockerfile
       args:
         SERVICE_PATH: backend/services/document-parser-service
+        SERVICE_APP_NAME: TalentMatchDocumentParser
+        INSTALL_S3: "true"
         INSTALL_PARSERS: "true"
     environment:
       APP_NAME: TalentMatchDocumentParser
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-true}
+      SESSION_DRIVER: array
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-15}
+      FILESYSTEM_DISK: s3
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_BUCKET: ${AWS_BUCKET:-resumes}
+      AWS_ENDPOINT: http://minio:9000
+      AWS_USE_PATH_STYLE_ENDPOINT: "true"
+      DOCUMENT_PARSE_TIMEOUT_SECONDS: ${DOCUMENT_PARSE_TIMEOUT_SECONDS:-15}
     ports:
       - "8001:8000"
+    depends_on:
+      minio:
+        condition: service_healthy
 
   skill-recognition-service:
     build:
@@ -127,11 +145,13 @@ services:
       dockerfile: backend/docker/laravel/Dockerfile
       args:
         SERVICE_PATH: backend/services/skill-recognition-service
+        SERVICE_APP_NAME: TalentMatchSkillRecognition
     environment:
       APP_NAME: TalentMatchSkillRecognition
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-true}
+      SESSION_DRIVER: array
     ports:
       - "8002:8000"
 
@@ -141,11 +161,13 @@ services:
       dockerfile: backend/docker/laravel/Dockerfile
       args:
         SERVICE_PATH: backend/services/assessment-service
+        SERVICE_APP_NAME: TalentMatchAssessment
     environment:
       APP_NAME: TalentMatchAssessment
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-true}
+      SESSION_DRIVER: array
     ports:
       - "8003:8000"
 
@@ -155,12 +177,14 @@ services:
       dockerfile: backend/docker/laravel/Dockerfile
       args:
         SERVICE_PATH: backend/services/report-service
+        SERVICE_APP_NAME: TalentMatchReports
         INSTALL_PDF: "true"
     environment:
       APP_NAME: TalentMatchReports
       APP_ENV: ${APP_ENV:-local}
       APP_KEY: ${APP_KEY}
       APP_DEBUG: ${APP_DEBUG:-true}
+      SESSION_DRIVER: array
     ports:
       - "8004:8000"
 

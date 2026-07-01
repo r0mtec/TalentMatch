@@ -22,9 +22,13 @@ class ParseResumeJob implements ShouldQueue
 
         try {
             $result = $client->parse($candidate);
+            $sections = $result['sections'] ?? [];
 
             $candidate->update([
-                'parsed_text' => $result['text'] ?? '',
+                'parsed_text' => $result['plain_text'] ?? '',
+                'grade' => $candidate->grade ?: ($sections['grade'] ?? null),
+                'location' => $candidate->location ?: ($sections['location'] ?? null),
+                'languages' => $candidate->languages ?: ($sections['languages'] ?? null),
                 'parsing_status' => 'parsed',
                 'recognition_status' => 'pending',
             ]);

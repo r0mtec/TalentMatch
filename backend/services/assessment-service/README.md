@@ -61,15 +61,31 @@ coverage = sum(weights of matched requirements) / sum(weights of all requirement
 - `GET /health`
 - `GET /ready`
 
-## Текущее состояние
+## Реализация
 
-Сервис содержит базовый `CoverageCalculator`. Он уже умеет считать weighted coverage по массивам требований и навыков, но работает как каркас.
+Сервис содержит `CoverageCalculator`, который работает только с payload запроса и не читает БД.
 
-## Что нужно реализовать дальше
+Сопоставление требований:
 
-- сопоставление по `technology_id`, а не только по `normalized_name`;
-- учет свободного текста требований;
-- перенос evidence из `candidate_skills`;
-- проверку грейда, локации и гражданства;
-- обработку edge cases;
-- контракт ответа, полностью совпадающий с таблицами `assessments` и `assessment_requirement_results`.
+- сначала по `technology_id`, если он есть у требования и навыка;
+- затем по `normalized_name` и `raw_text`;
+- свободный текст нормализуется: lower-case, базовая пунктуация, лишние пробелы;
+- для совпадений используется короткая проверка границ токенов, чтобы не ловить часть другого слова.
+
+Результат содержит:
+
+- `must_score`;
+- `nice_score`;
+- `total_score`;
+- `has_missing_must_requirements`;
+- `grade_match_status`;
+- `location_match_status`;
+- `citizenship_match_status`;
+- detail по каждому requirement с `matched_candidate_skill_id`, `evidence_text`, `score_contribution` и `comment`.
+
+Статусы условий:
+
+- `matches`;
+- `does_not_match`;
+- `unknown`.
+
