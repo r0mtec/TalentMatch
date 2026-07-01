@@ -1,5 +1,4 @@
-import { NavLink } from "react-router-dom";
-import { useMockApi } from "../../services/mockApi.js";
+﻿import { NavLink, useNavigate } from "react-router-dom";
 
 const navItems = [
   ["Дашборд", "/dashboard", "bi-grid-1x2"],
@@ -7,11 +6,23 @@ const navItems = [
   ["Кандидаты", "/candidates", "bi-people"],
   ["Сравнение", "/comparison", "bi-bar-chart"],
   ["Справочник", "/dictionary", "bi-book"],
-  ["Пользователи", "/users", "bi-person-gear"],
+  ["Пользователи", "/users", "bi-person-gear", "admin"],
 ];
 
 export function AppLayout({ children }) {
-  const { user, loading, error } = useMockApi();
+  const navigate = useNavigate();
+  const storedUser = JSON.parse(window.localStorage.getItem("talentmatch_user") || "null");
+  const displayUser = {
+    fullName: storedUser?.name || storedUser?.login || "Пользователь",
+    initials: storedUser?.initials || String(storedUser?.login || "TM").slice(0, 2).toUpperCase(),
+    role: storedUser?.role || "account_manager",
+  };
+
+  const logout = () => {
+    window.localStorage.removeItem("talentmatch_token");
+    window.localStorage.removeItem("talentmatch_user");
+    navigate("/login", { replace: true });
+  };
 
   return (
     <div className="app-shell">
@@ -21,7 +32,7 @@ export function AppLayout({ children }) {
           <span>TalentMatch</span>
         </div>
         <nav className="nav">
-          {navItems.map(([label, to, icon]) => (
+          {navItems.filter(([, , , role]) => !role || role === displayUser.role).map(([label, to, icon]) => (
             <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
               <i className={`bi ${icon}`} aria-hidden="true" />
               {label}
@@ -33,17 +44,20 @@ export function AppLayout({ children }) {
         <header className="topbar">
           <div>
             <b>Рабочее пространство</b>
-            <span>Mock-режим, данные хранятся в памяти</span>
+            <span>Подбор специалистов по требованиям заказчика</span>
           </div>
           <div className="user-chip">
-            <span>{user.fullName}</span>
-            <span className="avatar">{user.initials}</span>
+            <span>{displayUser.fullName}</span>
+            <span className="avatar">{displayUser.initials}</span>
+            <button type="button" className="logout-button" onClick={logout}>
+              <i className="bi bi-box-arrow-right" aria-hidden="true" />
+              Выйти
+            </button>
           </div>
         </header>
-        {loading ? <div className="loading-line">Обновляем mock-данные...</div> : null}
-        {error ? <div className="alert danger">{error}</div> : null}
         <div className="page">{children}</div>
       </main>
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
@@ -8,22 +8,51 @@ import { Input } from "../../components/ui/Form.jsx";
 import { Pagination, usePagination } from "../../components/ui/Pagination.jsx";
 import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
 import { gradeOptions } from "../../data/mockData.js";
-import { useMockApi } from "../../services/mockApi.js";
-import { formatDate, gradeBadge, statusBadge, statusLabels } from "../../utils/formatters.js";
+import { getRequests } from "../../services/requestsApi.js";
+import { formatDate, gradeBadge, shortId, statusBadge, statusLabels } from "../../utils/formatters.js";
 
 const statusFilterOptions = ["Активен", "Черновик", "Закрыт"];
 const statusByLabel = { Активен: "active", Черновик: "draft", Закрыт: "closed" };
 
 export function RequestsPage() {
   const navigate = useNavigate();
-  const { requests } = useMockApi();
+  const [requests, setRequests] = useState([]);
   const [grades, setGrades] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const params = {
+          grade: grades.length === 1 ? grades[0] : undefined,
+          status: statuses.length === 1 ? statusByLabel[statuses[0]] : undefined,
+          created_from: dateFrom || undefined,
+          created_to: dateTo || undefined,
+        };
+        const result = await getRequests(params);
+        if (!ignore) setRequests(result.items);
+      } catch (caught) {
+        if (!ignore) setError(caught.message || "Не удалось загрузить запросы.");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [dateFrom, dateTo, grades, statuses]);
 
   const filtered = useMemo(() => requests.filter((request) => {
     const statusValues = statuses.map((status) => statusByLabel[status]);
+    // TODO: убрать frontend-фильтрацию, если backend добавит поддержку множественных grade/status query params.
     return (!grades.length || grades.includes(request.grade))
       && (!statusValues.length || statusValues.includes(request.status))
       && (!dateFrom || request.createdAt >= dateFrom)
@@ -50,13 +79,15 @@ export function RequestsPage() {
             </div>
           </div>
         </div>
-        {filtered.length ? (
+        {error ? <div className="alert danger">{error}</div> : null}
+        {loading ? <div className="loading-line inline">Загружаем запросы...</div> : null}
+        {!loading && filtered.length ? (
           <DataTable>
             <thead><tr><th>ID</th><th>Должность</th><th>Грейд</th><th>Дата создания</th><th>Статус</th><th>Действия</th></tr></thead>
             <tbody>
               {pagination.pageItems.map((request) => (
                 <tr key={request.id}>
-                  <td>{request.id}</td>
+                  <td>{shortId(request.id)}</td>
                   <td className="entity-name">{request.position}</td>
                   <td><Badge tone={gradeBadge(request.grade)}>{request.grade}</Badge></td>
                   <td>{formatDate(request.createdAt)}</td>
@@ -66,18 +97,23 @@ export function RequestsPage() {
               ))}
             </tbody>
           </DataTable>
-        ) : <EmptyState title="Запросы не найдены" text="Попробуйте сбросить фильтры." />}
-        <Pagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          totalPages={pagination.totalPages}
-          start={pagination.start}
-          end={pagination.end}
-          total={pagination.total}
-          onPageChange={pagination.setPage}
-          onPageSizeChange={pagination.setPageSize}
-        />
+        ) : !loading ? <EmptyState title="Запросы не найдены" text="Попробуйте сбросить фильтры или повторить позже." /> : null}
+        {!loading ? (
+          <Pagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            totalPages={pagination.totalPages}
+            start={pagination.start}
+            end={pagination.end}
+            total={pagination.total}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        ) : null}
       </Card>
     </>
   );
 }
+
+
+

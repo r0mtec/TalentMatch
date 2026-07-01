@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button.jsx";
 import { Card } from "../../components/ui/Card.jsx";
@@ -6,14 +6,16 @@ import { Field, Input, Select, Textarea } from "../../components/ui/Form.jsx";
 import { ConfirmModal } from "../../components/ui/Modal.jsx";
 import { useToast } from "../../components/ui/Toast.jsx";
 import { gradeOptions } from "../../data/mockData.js";
-import { useMockApi } from "../../services/mockApi.js";
+import { runAssessment } from "../../services/assessmentsApi.js";
+import { uploadCandidateResume } from "../../services/candidatesApi.js";
+import { createRequest as createBackendRequest, getRequestById, updateRequest as updateBackendRequest } from "../../services/requestsApi.js";
+import { mapBackendValidationToFrontend } from "../../services/mappers/requestMapper.js";
 import { weightLabel } from "../../utils/formatters.js";
 
 const blankRequest = {
   position: "",
   grade: "Middle",
   description: "",
-  tasks: "",
   location: "",
   citizenship: "",
   workload: "",
@@ -24,6 +26,7 @@ const blankRequest = {
 };
 
 const weightTones = { 1: "weight-low", 2: "weight-medium", 3: "weight-high", 4: "weight-critical" };
+const localErrorFields = new Set(["grade", "mustHave", "files"]);
 
 function RequirementBlock({ title, tone, items, setItems, defaultWeight }) {
   const [tech, setTech] = useState("");
@@ -36,8 +39,9 @@ function RequirementBlock({ title, tone, items, setItems, defaultWeight }) {
       {
         id: `req-${Date.now()}`,
         title: tech.trim(),
-        technologyId: tech.trim().toLowerCase().replace(/\s+/g, "-"),
-        weight: defaultWeight,
+        raw_text: tech.trim(),
+        technologyId: null,
+        weight: Number(defaultWeight),
       },
     ]);
     setTech("");
@@ -79,7 +83,7 @@ function RequirementBlock({ title, tone, items, setItems, defaultWeight }) {
         ))}
       </div>
       <div className="add-line">
-        <Input value={tech} onChange={(event) => setTech(event.target.value)} placeholder="Добавить технологию..." />
+        <Input value={tech} onChange={(event) => setTech(event.target.value)} placeholder="Добавить требование..." />
         <Button variant="secondary" icon="bi-plus-lg" onClick={add}>Добавить</Button>
       </div>
       {pendingDelete ? (
@@ -98,12 +102,38 @@ export function RequestFormPage() {
   const { requestId } = useParams();
   const navigate = useNavigate();
   const { notify } = useToast();
-  const { requests, createRequest, updateRequest, loading } = useMockApi();
-  const existing = useMemo(() => requests.find((request) => request.id === requestId), [requestId, requests]);
-  const [form, setForm] = useState(existing ? { engagementPeriod: "", ...existing } : blankRequest);
+  const [existing, setExisting] = useState(null);
+  const [form, setForm] = useState(blankRequest);
   const [files, setFiles] = useState([]);
   const [errors, setErrors] = useState({});
   const [warning, setWarning] = useState("");
+  const [loading, setLoading] = useState(Boolean(requestId));
+  const [apiError, setApiError] = useState("");
+  const backendFieldErrors = Object.entries(errors).filter(([field]) => !localErrorFields.has(field));
+
+  useEffect(() => {
+    if (!requestId) return;
+    let ignore = false;
+    const load = async () => {
+      setLoading(true);
+      setApiError("");
+      try {
+        const request = await getRequestById(requestId);
+        if (!ignore) {
+          setExisting(request);
+          setForm({ ...blankRequest, ...request });
+        }
+      } catch (caught) {
+        if (!ignore) setApiError(caught.message || "Не удалось загрузить запрос.");
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [requestId]);
 
   const update = (field, value) => setForm({ ...form, [field]: value });
   const addFiles = (fileList) => {
@@ -114,7 +144,6 @@ export function RequestFormPage() {
   const submit = async (status) => {
     const nextErrors = {};
     if (!form.grade) nextErrors.grade = "Выберите грейд.";
-    if (!form.tasks.trim()) nextErrors.tasks = "Опишите задачи.";
     if (!form.mustHave.length) nextErrors.mustHave = "Добавьте минимум одно обязательное требование.";
     if (status === "active" && !files.length && !existing) nextErrors.files = "Прикрепите хотя бы одно резюме к заявке.";
     setErrors(nextErrors);
@@ -126,13 +155,35 @@ export function RequestFormPage() {
           : "",
     );
     if (Object.keys(nextErrors).length) return;
-    if (existing) {
-      await updateRequest(existing.id, { ...form, status, files });
-    } else {
-      await createRequest({ ...form, status, files });
+    setLoading(true);
+    setApiError("");
+    try {
+      const saved = existing
+        ? await updateBackendRequest(existing.id, form, status)
+        : await createBackendRequest(form, status);
+      if (files.length) {
+        for (const file of files) {
+          try {
+            const candidate = await uploadCandidateResume(file, {
+              display_name: file.name.replace(/\.(pdf|docx)$/i, ""),
+              grade: form.grade,
+              location: form.location,
+              citizenship: form.citizenship,
+            });
+            if (saved.id && candidate?.id) await runAssessment(saved.id, candidate.id);
+          } catch (uploadError) {
+            throw new Error(`Заявка сохранена, но резюме ${file.name} не обработано: ${uploadError.message || "ошибка обработки"}`);
+          }
+        }
+      }
+      notify(status === "active" ? "Запрос активирован. Данные отправлены." : "Черновик сохранён.");
+      navigate("/requests");
+    } catch (caught) {
+      setErrors(mapBackendValidationToFrontend(caught.errors || {}));
+      setApiError(caught.message || "Не удалось сохранить запрос.");
+    } finally {
+      setLoading(false);
     }
-    notify(status === "active" ? "Запрос активирован. Резюме отправлены на mock-обработку." : "Черновик сохранён.");
-    navigate("/requests");
   };
 
   return (
@@ -141,6 +192,15 @@ export function RequestFormPage() {
         <div><h1>{existing ? "Редактирование запроса" : "Создание запроса"}</h1><p>Настройте требования и веса навыков</p></div>
       </div>
       {warning ? <div className="alert warning">{warning}</div> : null}
+      {apiError ? <div className="alert danger">{apiError}</div> : null}
+      {backendFieldErrors.length ? (
+        <div className="alert danger">
+          <b>Проверьте данные:</b>
+          <ul>
+            {backendFieldErrors.map(([field, message]) => <li key={field}>{field}: {message}</li>)}
+          </ul>
+        </div>
+      ) : null}
       {errors.mustHave ? <div className="alert danger">{errors.mustHave}</div> : null}
       {errors.files ? <div className="alert danger">{errors.files}</div> : null}
       <Card>
@@ -155,7 +215,6 @@ export function RequestFormPage() {
           <Field label="Срок привлечения"><Input value={form.engagementPeriod} onChange={(event) => update("engagementPeriod", event.target.value)} placeholder="Например: бессрочно / 3 месяца / до конца проекта" /></Field>
         </div>
         <Field label="Описание проекта"><Textarea value={form.description} onChange={(event) => update("description", event.target.value)} /></Field>
-        <Field label="Задачи" error={errors.tasks}><Textarea value={form.tasks} onChange={(event) => update("tasks", event.target.value)} /></Field>
       </Card>
       <div className="two-col">
         <RequirementBlock title="Обязательные (Must have)" tone="must" items={form.mustHave} setItems={(mustHave) => update("mustHave", mustHave)} defaultWeight={3} />
@@ -192,3 +251,9 @@ export function RequestFormPage() {
     </>
   );
 }
+
+
+
+
+
+
