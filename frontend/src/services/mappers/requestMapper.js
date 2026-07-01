@@ -1,8 +1,8 @@
-const statusToBackend = { active: "active", draft: "draft", closed: "closed" };
+﻿const statusToBackend = { active: "active", draft: "draft", closed: "closed" };
 const statusFromBackend = { active: "active", draft: "draft", closed: "closed" };
 
 export const isValidUuid = (value) =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(String(value || ""));
 
 const normalizeRequirement = (requirement, type, requestId) => ({
   id: requirement.id,
@@ -33,7 +33,6 @@ export function mapBackendRequestToFrontend(payload) {
     position: request?.position || request?.post || request?.title || "",
     post: request?.position || request?.post || request?.title || "",
     description: request?.project_description || request?.description || "",
-    tasks: request?.tasks || "",
     grade: request?.grade || "Middle",
     location: request?.location || "",
     citizenship: request?.citizenship || "",
@@ -61,19 +60,29 @@ export function mapFrontendRequestToBackend(form, status) {
     workload: form.workload || null,
     start_date: form.startDate || form.employment_date || null,
     status: statusToBackend[status || form.status] || status || form.status || "draft",
-    // TODO: отправлять engagement_period/tasks после добавления полей в OpenAPI CustomerRequestInput.
+    // TODO: отправлять engagement_period после добавления поля в OpenAPI CustomerRequestInput.
   };
 }
 
-export function mapFrontendRequirementToBackend(requirement, type) {
+export function mapRequirementToBackend(requirement, type) {
   const technologyId = requirement.technology_id || requirement.technologyId;
+  const rawText = requirement.raw_text || requirement.title || requirement.name || "";
   return {
     technology_id: isValidUuid(technologyId) ? technologyId : null,
-    raw_text: requirement.raw_text || requirement.title || "",
+    raw_text: rawText.trim(),
     type,
     weight: Number(requirement.weight || 1),
   };
 }
+
+export function mapRequirementsToBackend(mustHave = [], niceToHave = []) {
+  return [
+    ...mustHave.map((requirement) => mapRequirementToBackend(requirement, "must")),
+    ...niceToHave.map((requirement) => mapRequirementToBackend(requirement, "nice")),
+  ];
+}
+
+export const mapFrontendRequirementToBackend = mapRequirementToBackend;
 
 export function mapBackendValidationToFrontend(errors = {}) {
   const fields = {

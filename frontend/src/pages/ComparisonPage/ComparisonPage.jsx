@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
@@ -11,7 +11,7 @@ import { getAssessmentsByRequest } from "../../services/assessmentsApi.js";
 import { getCandidates } from "../../services/candidatesApi.js";
 import { attachAssessmentsToCandidates, getCandidateAssessments } from "../../services/mappers/candidateMapper.js";
 import { getRequests } from "../../services/requestsApi.js";
-import { formatDate, gradeBadge } from "../../utils/formatters.js";
+import { formatDate, gradeBadge, requestOptionLabel, requestTitle } from "../../utils/formatters.js";
 
 const missingMustCount = (assessment) =>
   assessment.missingMustRequirements?.length || (assessment.hasMissingMustRequirements ? 1 : 0);
@@ -80,7 +80,7 @@ export function ComparisonPage() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Сравнение кандидатов</h1><p>Сравнение строится по assessment-записям backend.</p></div>
+        <div><h1>Сравнение кандидатов</h1><p>Сопоставление кандидатов с требованиями выбранной заявки</p></div>
       </div>
       <Card>
         {apiError ? <div className="alert danger">{apiError}</div> : null}
@@ -88,7 +88,7 @@ export function ComparisonPage() {
           <Input placeholder="Поиск по кандидату или навыкам" value={query} onChange={(event) => setQuery(event.target.value)} />
           <Select value={requestId} onChange={(event) => setRequestId(event.target.value)}>
             <option value="Все">Запрос: Все</option>
-            {requests.map((item) => <option key={item.id} value={item.id}>{item.id} {item.position}</option>)}
+            {requests.map((item) => <option key={item.id} value={item.id}>{requestOptionLabel(item)}</option>)}
           </Select>
           <Select value={grade} onChange={(event) => setGrade(event.target.value)}>
             <option value="Все">Грейд: Все</option>
@@ -118,7 +118,7 @@ export function ComparisonPage() {
                   return (
                     <tr key={`${candidate.id}-${assessment.id}`}>
                       <td className="entity-name">{candidate.fullName || candidate.fio || candidate.fileName || "Кандидат без имени"}</td>
-                      <td>{request ? `${request.id} ${request.position}` : "Заявка недоступна"}</td>
+                      <td>{request ? requestTitle(request) : "Заявка недоступна"}</td>
                       <td><Badge tone={gradeBadge(candidate.grade)}>{candidate.grade}</Badge></td>
                       <td>{assessment.totalCoverage}%</td>
                       <td>{assessment.mustCoverage}%</td>
@@ -149,3 +149,4 @@ export function ComparisonPage() {
     </>
   );
 }
+

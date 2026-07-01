@@ -1,20 +1,44 @@
-import { ApiError, apiRequest } from "./apiClient.js";
-import { mapBackendRequestToFrontend, mapFrontendRequestToBackend, mapFrontendRequirementToBackend, mapPaginatedRequests } from "./mappers/requestMapper.js";
+﻿import { ApiError, apiRequest } from "./apiClient.js";
+import {
+  isValidUuid,
+  mapBackendRequestToFrontend,
+  mapFrontendRequestToBackend,
+  mapPaginatedRequests,
+  mapRequirementToBackend,
+  mapRequirementsToBackend,
+} from "./mappers/requestMapper.js";
+
+const typedRequirements = (form) => [
+  ...(form.mustHave || []).map((item) => ({ item, type: "must" })),
+  ...(form.niceToHave || []).map((item) => ({ item, type: "nice" })),
+];
 
 const createRequirements = async (requestId, form) => {
-  const requirements = [
-    ...(form.mustHave || []).map((item) => ({ item, type: "must" })),
-    ...(form.niceToHave || []).map((item) => ({ item, type: "nice" })),
-  ];
+  const requirements = mapRequirementsToBackend(form.mustHave, form.niceToHave);
   const created = [];
   for (const requirement of requirements) {
     const result = await apiRequest(`/requests/${requestId}/requirements`, {
       method: "POST",
-      body: mapFrontendRequirementToBackend(requirement.item, requirement.type),
+      body: requirement,
     });
     created.push(result);
   }
   return created;
+};
+
+const syncRequirements = async (requestId, form) => {
+  const saved = [];
+  for (const requirement of typedRequirements(form)) {
+    const body = mapRequirementToBackend(requirement.item, requirement.type);
+    const hasBackendId = isValidUuid(requirement.item.id);
+    const result = await apiRequest(hasBackendId ? `/requirements/${requirement.item.id}` : `/requests/${requestId}/requirements`, {
+      method: hasBackendId ? "PATCH" : "POST",
+      body,
+    });
+    saved.push(result);
+  }
+  // TODO: удалить requirements, убранные из формы, когда backend/OpenAPI предоставит batch replace или когда UI начнёт хранить original ids для diff.
+  return saved;
 };
 
 export async function getRequests(params = {}) {
@@ -42,7 +66,6 @@ export async function createRequest(form, status = form.status || "draft") {
       });
     }
   }
-  // TODO: подключить отправку файлов резюме к заявке после появления request_id/files endpoint в OpenAPI.
   return request.id ? getRequestById(request.id).catch(() => request) : request;
 }
 
@@ -51,8 +74,7 @@ export async function updateRequest(id, form, status = form.status || "draft") {
     method: "PATCH",
     body: mapFrontendRequestToBackend(form, status),
   });
-  // TODO: заменить на batch sync требований, когда backend/OpenAPI предоставит endpoint для полной замены списка.
-  await createRequirements(id, form).catch((error) => {
+  await syncRequirements(id, form).catch((error) => {
     throw new ApiError("Запрос обновлён, но требования не синхронизированы. Проверьте текст требований и веса.", {
       status: error.status,
       errors: error.errors,

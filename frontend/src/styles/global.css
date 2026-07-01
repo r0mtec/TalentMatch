@@ -1,4 +1,4 @@
-* { box-sizing: border-box; }
+﻿* { box-sizing: border-box; }
 body {
   margin: 0;
   background: var(--bg);
@@ -121,6 +121,11 @@ h2 { font-size: 18px; margin-bottom: 18px; font-weight: 700; }
 .dictionary-groups { display: grid; gap: 18px; }
 .dictionary-section { border: 1px solid var(--line); border-radius: 16px; padding: 18px; background: #fbfdff; }
 .dictionary-section .data-table { min-width: 620px; }
+.synonym-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 360px; }
+.synonym-token { display: inline-block; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #38506f; background: #edf2f7; border-radius: 999px; padding: 5px 9px; font-size: 13px; font-weight: 600; }
+.synonym-more { cursor: help; }
+.synonym-editor { display: grid; gap: 12px; }
+.synonym-chip-list { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; min-height: 38px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: #f8fbff; }
 .resume-card { margin-top: 18px; }
 .upload-zone { display: grid; place-items: center; gap: 8px; min-height: 150px; border: 1px dashed #a9bad1; border-radius: 16px; background: #f8fbff; cursor: pointer; color: var(--primary); margin-top: 14px; }
 .upload-zone .bi { font-size: 24px; }
@@ -158,3 +163,4 @@ h2 { font-size: 18px; margin-bottom: 18px; font-weight: 700; }
   .period-inputs { grid-template-columns: 1fr; }
   .linked-request { align-items: flex-start; flex-direction: column; }
 }
+

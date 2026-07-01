@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../../components/ui/Button.jsx";
 import { Card } from "../../components/ui/Card.jsx";
@@ -16,7 +16,6 @@ const blankRequest = {
   position: "",
   grade: "Middle",
   description: "",
-  tasks: "",
   location: "",
   citizenship: "",
   workload: "",
@@ -27,7 +26,7 @@ const blankRequest = {
 };
 
 const weightTones = { 1: "weight-low", 2: "weight-medium", 3: "weight-high", 4: "weight-critical" };
-const localErrorFields = new Set(["grade", "tasks", "mustHave", "files"]);
+const localErrorFields = new Set(["grade", "mustHave", "files"]);
 
 function RequirementBlock({ title, tone, items, setItems, defaultWeight }) {
   const [tech, setTech] = useState("");
@@ -40,8 +39,9 @@ function RequirementBlock({ title, tone, items, setItems, defaultWeight }) {
       {
         id: `req-${Date.now()}`,
         title: tech.trim(),
-        technologyId: tech.trim().toLowerCase().replace(/\s+/g, "-"),
-        weight: defaultWeight,
+        raw_text: tech.trim(),
+        technologyId: null,
+        weight: Number(defaultWeight),
       },
     ]);
     setTech("");
@@ -83,7 +83,7 @@ function RequirementBlock({ title, tone, items, setItems, defaultWeight }) {
         ))}
       </div>
       <div className="add-line">
-        <Input value={tech} onChange={(event) => setTech(event.target.value)} placeholder="Добавить технологию..." />
+        <Input value={tech} onChange={(event) => setTech(event.target.value)} placeholder="Добавить требование..." />
         <Button variant="secondary" icon="bi-plus-lg" onClick={add}>Добавить</Button>
       </div>
       {pendingDelete ? (
@@ -144,7 +144,6 @@ export function RequestFormPage() {
   const submit = async (status) => {
     const nextErrors = {};
     if (!form.grade) nextErrors.grade = "Выберите грейд.";
-    if (!form.tasks.trim()) nextErrors.tasks = "Опишите задачи.";
     if (!form.mustHave.length) nextErrors.mustHave = "Добавьте минимум одно обязательное требование.";
     if (status === "active" && !files.length && !existing) nextErrors.files = "Прикрепите хотя бы одно резюме к заявке.";
     setErrors(nextErrors);
@@ -173,11 +172,11 @@ export function RequestFormPage() {
             });
             if (saved.id && candidate?.id) await runAssessment(saved.id, candidate.id);
           } catch (uploadError) {
-            throw new Error(`Заявка сохранена, но резюме ${file.name} не обработано: ${uploadError.message || "ошибка backend"}`);
+            throw new Error(`Заявка сохранена, но резюме ${file.name} не обработано: ${uploadError.message || "ошибка обработки"}`);
           }
         }
       }
-      notify(status === "active" ? "Запрос активирован. Данные отправлены на backend." : "Черновик сохранён на backend.");
+      notify(status === "active" ? "Запрос активирован. Данные отправлены." : "Черновик сохранён.");
       navigate("/requests");
     } catch (caught) {
       setErrors(mapBackendValidationToFrontend(caught.errors || {}));
@@ -216,7 +215,6 @@ export function RequestFormPage() {
           <Field label="Срок привлечения"><Input value={form.engagementPeriod} onChange={(event) => update("engagementPeriod", event.target.value)} placeholder="Например: бессрочно / 3 месяца / до конца проекта" /></Field>
         </div>
         <Field label="Описание проекта"><Textarea value={form.description} onChange={(event) => update("description", event.target.value)} /></Field>
-        <Field label="Задачи" error={errors.tasks}><Textarea value={form.tasks} onChange={(event) => update("tasks", event.target.value)} /></Field>
       </Card>
       <div className="two-col">
         <RequirementBlock title="Обязательные (Must have)" tone="must" items={form.mustHave} setItems={(mustHave) => update("mustHave", mustHave)} defaultWeight={3} />
@@ -253,3 +251,9 @@ export function RequestFormPage() {
     </>
   );
 }
+
+
+
+
+
+

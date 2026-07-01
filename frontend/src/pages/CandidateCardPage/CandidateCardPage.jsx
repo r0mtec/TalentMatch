@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
@@ -11,7 +11,7 @@ import { getAssessmentById, getAssessmentsByRequest, runAssessment } from "../..
 import { createCandidateSkill, deleteCandidateSkill, getCandidateById } from "../../services/candidatesApi.js";
 import { downloadAssessmentReport } from "../../services/reportsApi.js";
 import { getRequests } from "../../services/requestsApi.js";
-import { formatDate, gradeBadge, statusBadge, statusLabels } from "../../utils/formatters.js";
+import { formatDate, gradeBadge, requestOptionLabel, requestTitle, statusBadge, statusLabels } from "../../utils/formatters.js";
 
 const latestAssessment = (items) => [...items].sort((a, b) => {
   const dateDiff = new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
@@ -72,6 +72,7 @@ export function CandidateCardPage() {
   const recognizedSkills = candidate?.recognizedSkills || candidate?.skills || [];
   const reassessTargets = requests.filter((item) => item.id !== assessment?.request_id);
   const hasMissingMust = Boolean(assessment?.hasMissingMustRequirements || assessment?.missingMustRequirements?.length);
+  const isAssessmentCalculated = Boolean(assessment?.status === "calculated" || assessment?.calculatedAt || assessment?.requirementResults?.length);
 
   const sourceByRequirement = useMemo(() => {
     if (!assessment) return {};
@@ -82,7 +83,7 @@ export function CandidateCardPage() {
         || item.technology_id === requirement.technology_id
         || String(item.title || "").toLowerCase() === String(requirement.title || "").toLowerCase(),
       );
-      map[requirement.id] = requirement.evidenceText || skill?.sourceText || "Фрагмент резюме пока не передан backend.";
+      map[requirement.id] = requirement.evidenceText || skill?.sourceText || "Фрагмент резюме пока не найден.";
     });
     return map;
   }, [assessment, recognizedSkills]);
@@ -180,7 +181,7 @@ export function CandidateCardPage() {
           >
             Прогнать под другой запрос
           </Button>
-          <Button icon="bi-file-earmark-pdf" disabled={!assessment?.id || actionLoading === "report"} onClick={exportReport}>
+          <Button icon="bi-file-earmark-pdf" disabled={!assessment?.id || !isAssessmentCalculated || actionLoading === "report"} onClick={exportReport}>
             {actionLoading === "report" ? "Готовим..." : "Экспорт PDF"}
           </Button>
         </div>
@@ -198,14 +199,19 @@ export function CandidateCardPage() {
       </Card>
       {!assessment ? (
         <Card>
-          <EmptyState title="Оценка покрытия ещё не выполнена" text="Запустите assessment для нужной заявки. Связь candidate-request хранится через assessment." />
+          <EmptyState title="Оценка покрытия ещё не выполнена" text="Выберите заявку и запустите оценку покрытия для кандидата." />
+        </Card>
+      ) : null}
+      {assessment && !isAssessmentCalculated ? (
+        <Card>
+          <EmptyState title="Оценка покрытия ещё не выполнена" text={`Текущий статус: ${assessment.status || "processing"}. Результат появится после обработки резюме.`} />
         </Card>
       ) : null}
       {assessment && request ? (
         <Card className="linked-request">
           <div>
             <span className="eyebrow">Связанный запрос</span>
-            <h2><Link to={`/requests/${request.id}`}>{request.id} {request.position}</Link></h2>
+            <h2><Link to={`/requests/${request.id}`}>{requestTitle(request)}</Link></h2>
           </div>
           <div className="linked-meta">
             <Badge tone={gradeBadge(request.grade)}>{request.grade}</Badge>
@@ -213,9 +219,9 @@ export function CandidateCardPage() {
           </div>
         </Card>
       ) : null}
-      {assessment && !request ? <div className="alert warning">Assessment найден, но связанная заявка недоступна в текущем ответе backend.</div> : null}
-      {assessment && hasMissingMust ? <div className="alert warning">Кандидат имеет неполное соответствие: есть незакрытые обязательные требования.</div> : null}
-      {assessment ? (
+      {assessment && !request ? <div className="alert warning">Связанная заявка недоступна.</div> : null}
+      {assessment && isAssessmentCalculated && hasMissingMust ? <div className="alert warning">Кандидат имеет неполное соответствие: есть незакрытые обязательные требования.</div> : null}
+      {assessment && isAssessmentCalculated ? (
         <div className="metric-grid colored">
           <Card className="metric-blue"><span>Общее покрытие</span><strong>{assessment.totalCoverage}%</strong></Card>
           <Card className="metric-green"><span>Must have</span><strong>{assessment.mustCoverage}%</strong></Card>
@@ -227,7 +233,7 @@ export function CandidateCardPage() {
           <h2>Распознанный текст</h2>
           <Button variant="secondary" onClick={() => setTextOpen(!textOpen)}>{textOpen ? "Скрыть" : "Показать"}</Button>
         </div>
-        {textOpen ? <p className="recognized-text">{candidate.recognized_text || "Распознанный текст пока не получен от backend."}</p> : null}
+        {textOpen ? <p className="recognized-text">{candidate.recognized_text || "Распознанный текст пока не получен."}</p> : null}
       </Card>
       <Card>
         <div className="section-head">
@@ -261,7 +267,7 @@ export function CandidateCardPage() {
           <div className="tag-row">{recognizedSkills.length ? recognizedSkills.map((skill) => <Badge key={skill.id || skill.title}>{skill.title}</Badge>) : "Навыки пока не распознаны."}</div>
         )}
       </Card>
-      {assessment ? (
+      {assessment && isAssessmentCalculated ? (
         <div className="two-col">
           <Card>
             <h2>Закрытые требования</h2>
@@ -275,7 +281,7 @@ export function CandidateCardPage() {
                   </div>
                 ))}
               </div>
-            ) : <EmptyState title="Нет закрытых требований" text="Backend пока не вернул совпавшие требования для этой оценки." />}
+            ) : <EmptyState title="Нет закрытых требований" text="Для этой оценки пока нет совпавших требований." />}
           </Card>
           <Card>
             <h2>Отсутствующие требования</h2>
@@ -283,16 +289,16 @@ export function CandidateCardPage() {
               <div className="requirement-list">
                 {assessment.missingRequirements.map((item) => <div key={item.id} className="check-item danger">× {item.title}</div>)}
               </div>
-            ) : <EmptyState title="Нет детализации" text="Backend пока не вернул список отсутствующих требований." />}
+            ) : <EmptyState title="Нет детализации" text="Для этой оценки пока нет списка отсутствующих требований." />}
           </Card>
         </div>
       ) : null}
       {reassessOpen ? (
         <Modal title="Прогнать под другой запрос" onClose={() => setReassessOpen(false)}>
-          <p className="hint">Будет создана новая assessment-запись для выбранной заявки и текущего кандидата.</p>
+          <p className="hint">Будет запущена новая оценка кандидата под выбранную заявку.</p>
           <Select value={targetRequestId} onChange={(event) => setTargetRequestId(event.target.value)}>
             {reassessTargets.map((item) => (
-              <option key={item.id} value={item.id}>{item.id} {item.position}</option>
+              <option key={item.id} value={item.id}>{requestOptionLabel(item)}</option>
             ))}
           </Select>
           <div className="actions-bar">
@@ -306,3 +312,6 @@ export function CandidateCardPage() {
     </>
   );
 }
+
+
+

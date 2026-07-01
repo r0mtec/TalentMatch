@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
 import { Card } from "../../components/ui/Card.jsx";
@@ -19,7 +19,19 @@ import {
 } from "../../services/technologiesApi.js";
 import { groupLabels } from "../../utils/formatters.js";
 
-const blank = { name: "", group: "languages", synonyms: "" };
+const blank = { name: "", group: "languages", synonyms: [], synonymDraft: "" };
+
+const normalizeSynonyms = (items = []) => {
+  const seen = new Set();
+  return items.reduce((acc, item) => {
+    const value = String(item || "").trim();
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) return acc;
+    seen.add(key);
+    acc.push(value);
+    return acc;
+  }, []);
+};
 
 export function DictionaryPage() {
   const { technologies: mockTechnologies, createTechnology, updateTechnology, deleteTechnology, loading } = useMockApi();
@@ -47,7 +59,7 @@ export function DictionaryPage() {
         if (!ignore) {
           setTechnologies(mockTechnologies);
           setUsingMockFallback(true);
-          setApiError(caught.message || "Не удалось загрузить справочник с backend.");
+          setApiError(caught.message || "Не удалось загрузить справочник.");
         }
       }
     };
@@ -72,8 +84,17 @@ export function DictionaryPage() {
   }, [query, technologies]);
 
   const openForm = (technology) => {
-    setForm(technology ? { ...technology, synonyms: technology.synonyms.join(", ") } : blank);
+    setForm(technology ? { ...technology, synonyms: normalizeSynonyms(technology.synonyms), synonymDraft: "" } : blank);
     setModal(true);
+  };
+
+  const addSynonym = () => {
+    const next = normalizeSynonyms([...form.synonyms, form.synonymDraft]);
+    setForm({ ...form, synonyms: next, synonymDraft: "" });
+  };
+
+  const removeSynonym = (synonym) => {
+    setForm({ ...form, synonyms: form.synonyms.filter((item) => item.toLowerCase() !== synonym.toLowerCase()) });
   };
 
   const syncBackendSynonyms = async (technology, nextSynonyms) => {
@@ -91,7 +112,7 @@ export function DictionaryPage() {
     const payload = {
       ...form,
       name: form.name.trim(),
-      synonyms: form.synonyms.split(",").map((item) => item.trim()).filter(Boolean),
+      synonyms: normalizeSynonyms(form.synonyms),
     };
     if (form.id) {
       if (usingMockFallback) {
@@ -132,7 +153,7 @@ export function DictionaryPage() {
         <Button icon="bi-plus-lg" onClick={() => openForm(null)}>Добавить технологию</Button>
       </div>
       <Card>
-        {usingMockFallback ? <div className="alert warning">Справочник показан в mock-режиме: {apiError}</div> : null}
+        {usingMockFallback ? <div className="alert warning">Справочник временно показывает локальные данные: {apiError}</div> : null}
         <div className="filters">
           <Input placeholder="Поиск по названию и синонимам" value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
@@ -160,7 +181,29 @@ export function DictionaryPage() {
               {technologyGroups.map((group) => <option key={group} value={group}>{groupLabels[group]}</option>)}
             </Select>
           </Field>
-          <Field label="Синонимы"><Input value={form.synonyms} onChange={(event) => setForm({ ...form, synonyms: event.target.value })} placeholder="php8, php 8.2" /></Field>
+          <Field label="Синонимы">
+            <div className="synonym-editor">
+              <div className="synonym-chip-list">
+                {form.synonyms.length ? form.synonyms.map((synonym) => (
+                  <button key={synonym} type="button" className="tag-remove" onClick={() => removeSynonym(synonym)}>{synonym} ×</button>
+                )) : <span className="hint">Синонимы не добавлены</span>}
+              </div>
+              <div className="add-line">
+                <Input
+                  value={form.synonymDraft}
+                  onChange={(event) => setForm({ ...form, synonymDraft: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addSynonym();
+                    }
+                  }}
+                  placeholder="Например: php8"
+                />
+                <Button variant="secondary" icon="bi-plus-lg" onClick={addSynonym}>Добавить</Button>
+              </div>
+            </div>
+          </Field>
           <div className="actions-bar">
             <Button icon="bi-check2" disabled={loading} onClick={submit}>{loading ? "Сохраняем..." : "Сохранить"}</Button>
             <Button variant="ghost" onClick={() => setModal(false)}>Отмена</Button>
@@ -177,6 +220,18 @@ export function DictionaryPage() {
         />
       ) : null}
     </>
+  );
+}
+
+function SynonymPreview({ synonyms = [] }) {
+  const visible = synonyms.slice(0, 3);
+  const hidden = synonyms.slice(3);
+  if (!synonyms.length) return "—";
+  return (
+    <div className="synonym-cell">
+      {visible.map((synonym) => <span key={synonym} className="synonym-token">{synonym}</span>)}
+      {hidden.length ? <span className="badge synonym-more" title={synonyms.join(", ")}>+{hidden.length}</span> : null}
+    </div>
   );
 }
 
@@ -202,7 +257,7 @@ function DictionarySection({ group, items, collapsed, onToggle, onEdit, onDelete
               {pagination.pageItems.map((technology) => (
                 <tr key={technology.id}>
                   <td className="entity-name">{technology.name}</td>
-                  <td>{technology.synonyms.length ? technology.synonyms.join(", ") : "—"}</td>
+                  <td><SynonymPreview synonyms={technology.synonyms} /></td>
                   <td className="table-actions">
                     <Button variant="secondary" icon="bi-pencil" onClick={() => onEdit(technology)}>Редактировать</Button>
                     <Button variant="danger" icon="bi-trash3" onClick={() => onDelete(technology)}>Удалить</Button>
@@ -226,3 +281,5 @@ function DictionarySection({ group, items, collapsed, onToggle, onEdit, onDelete
     </section>
   );
 }
+
+

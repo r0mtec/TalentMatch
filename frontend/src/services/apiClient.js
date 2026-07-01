@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = "http://localhost:8080/api";
+﻿const DEFAULT_API_BASE_URL = "http://localhost:8080/api";
 
 export class ApiError extends Error {
   constructor(message, { status = 0, errors = {}, payload = null } = {}) {
@@ -29,7 +29,7 @@ const extractErrorMessage = (payload, status) => {
   if (payload?.error) return payload.error;
   if (status === 401) return "Требуется авторизация.";
   if (status === 404) return "Запись не найдена.";
-  if (status >= 500) return "Backend временно недоступен.";
+  if (status >= 500) return "Сервер временно недоступен.";
   return "Не удалось выполнить запрос.";
 };
 
@@ -66,7 +66,7 @@ export async function apiRequest(path, options = {}) {
       signal,
     });
   } catch (error) {
-    throw new ApiError("Backend недоступен. Проверьте VITE_API_BASE_URL и запущен ли сервер.", { payload: error });
+    throw new ApiError("Сервер недоступен. Проверьте адрес API и запущен ли сервер.", { payload: error });
   }
 
   const payload = await parseResponse(response);
@@ -88,3 +88,4 @@ export async function apiRequest(path, options = {}) {
   }
   return payload;
 }
+

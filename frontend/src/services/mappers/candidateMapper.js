@@ -1,4 +1,4 @@
-export function mapBackendCandidateToFrontend(payload) {
+﻿export function mapBackendCandidateToFrontend(payload) {
   const candidate = payload?.data || payload?.candidate || payload;
   const skills = candidate?.skills || candidate?.candidate_skills || candidate?.recognizedSkills || [];
   const assessments = candidate?.assessments || [];
@@ -18,9 +18,9 @@ export function mapBackendCandidateToFrontend(payload) {
     file_mime_type: candidate?.file_mime_type,
     file_size: candidate?.file_size,
     file_checksum: candidate?.file_checksum,
-    parsing_status: candidate?.parsing_status || "parsed",
-    recognition_status: candidate?.recognition_status || "recognized",
-    recognized_text: candidate?.recognized_text || "",
+    parsing_status: candidate?.parsing_status || "uploaded",
+    recognition_status: candidate?.recognition_status || "pending",
+    recognized_text: candidate?.recognized_text || candidate?.parsed_text || "",
     recognizedSkills: skills.map(mapBackendCandidateSkillToFrontend),
     skills: skills.map(mapBackendCandidateSkillToFrontend),
     assessments: assessments.map(mapBackendAssessmentToFrontend),
@@ -128,3 +128,4 @@ export function attachAssessmentsToCandidates(candidates, assessments) {
     assessments: byCandidate.get(candidate.id) || candidate.assessments || [],
   }));
 }
+

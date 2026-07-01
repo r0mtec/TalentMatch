@@ -1,4 +1,4 @@
-import { apiRequest } from "./apiClient.js";
+﻿import { apiRequest } from "./apiClient.js";
 import { mapBackendCandidateToFrontend } from "./mappers/candidateMapper.js";
 import { mapBackendCandidateSkillToFrontend } from "./mappers/candidateMapper.js";
 import { isValidUuid } from "./mappers/requestMapper.js";
@@ -20,6 +20,7 @@ export async function getCandidateSkills(candidateId) {
   return data.map(mapBackendCandidateSkillToFrontend);
 }
 
+// TODO: document-parser-service and skill-recognition-service are internal backend services; browser uses /candidates/upload and reads returned processing statuses/skills.
 export async function uploadCandidateResume(file, fields = {}) {
   const formData = new FormData();
   formData.append("resume", file);
@@ -67,3 +68,4 @@ export async function updateCandidateSkill(skillId, skill) {
 export async function deleteCandidateSkill(skillId) {
   return apiRequest(`/candidate-skills/${skillId}`, { method: "DELETE" });
 }
+

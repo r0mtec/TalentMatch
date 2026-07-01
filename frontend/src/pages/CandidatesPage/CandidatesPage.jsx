@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
@@ -11,7 +11,7 @@ import { getAssessmentsByRequest } from "../../services/assessmentsApi.js";
 import { getCandidates } from "../../services/candidatesApi.js";
 import { attachAssessmentsToCandidates, getAssessmentRequestId, getPrimaryAssessment } from "../../services/mappers/candidateMapper.js";
 import { getRequests } from "../../services/requestsApi.js";
-import { formatDate, gradeBadge } from "../../utils/formatters.js";
+import { formatDate, gradeBadge, requestOptionLabel, requestTitle } from "../../utils/formatters.js";
 
 export function CandidatesPage() {
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ export function CandidatesPage() {
           setCandidates(attachAssessmentsToCandidates(candidateItems, assessmentLists.flat()));
         }
       } catch (caught) {
-        if (!ignore) setApiError(caught.message || "Не удалось загрузить кандидатов с backend.");
+        if (!ignore) setApiError(caught.message || "Не удалось загрузить кандидатов.");
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -68,7 +68,7 @@ export function CandidatesPage() {
       <div className="page-head">
         <div>
           <h1>Кандидаты</h1>
-          <p>Кандидаты из backend, связь с заявками строится через assessment.</p>
+          <p>Список резюме и результатов обработки кандидатов</p>
         </div>
       </div>
       <Card>
@@ -81,7 +81,7 @@ export function CandidatesPage() {
           </Select>
           <Select aria-label="Фильтр по запросу" value={requestId} onChange={(event) => setRequestId(event.target.value)}>
             <option value="Все">Запрос: Все</option>
-            {requests.map((request) => <option key={request.id} value={request.id}>{request.id} {request.position}</option>)}
+            {requests.map((request) => <option key={request.id} value={request.id}>{requestOptionLabel(request)}</option>)}
           </Select>
         </div>
         {loading ? <div className="loading-line inline">Загружаем кандидатов...</div> : null}
@@ -98,7 +98,7 @@ export function CandidatesPage() {
                     <tr key={candidate.id}>
                       <td className="entity-name">{candidate.fullName || candidate.fileName || "Кандидат без имени"}</td>
                       <td><Badge tone={gradeBadge(candidate.grade)}>{candidate.grade}</Badge></td>
-                      <td>{assessment && request ? `${request.id} ${request.position}` : "Оценка не выполнена"}</td>
+                      <td>{assessment && request ? requestTitle(request) : "Оценка не выполнена"}</td>
                       <td>
                         {skills.length ? (
                           <div className="tag-row">
@@ -133,3 +133,5 @@ export function CandidatesPage() {
     </>
   );
 }
+
+

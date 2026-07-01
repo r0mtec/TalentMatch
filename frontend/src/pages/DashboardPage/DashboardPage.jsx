@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+﻿import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Card } from "../../components/ui/Card.jsx";
@@ -7,7 +7,7 @@ import { getAssessmentsByRequest } from "../../services/assessmentsApi.js";
 import { getCandidates } from "../../services/candidatesApi.js";
 import { attachAssessmentsToCandidates, getCandidateAssessments } from "../../services/mappers/candidateMapper.js";
 import { getRequests } from "../../services/requestsApi.js";
-import { formatDate, gradeBadge, statusBadge, statusLabels } from "../../utils/formatters.js";
+import { formatDate, gradeBadge, shortId, statusBadge, statusLabels } from "../../utils/formatters.js";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -62,8 +62,8 @@ export function DashboardPage() {
     <>
       <div className="page-head">
         <div>
-          <h1>Здравствуйте, Анна</h1>
-          <p>Сводка TalentMatch по активным запросам, кандидатам и покрытию требований</p>
+          <h1>Дашборд</h1>
+          <p>Сводка по активным запросам, кандидатам и покрытию требований</p>
         </div>
       </div>
       <div className="quick-grid">
@@ -93,7 +93,7 @@ export function DashboardPage() {
               <tbody>
                 {requests.slice(0, 5).map((request) => (
                   <tr key={request.id}>
-                    <td>{request.id}</td>
+                    <td>{shortId(request.id)}</td>
                     <td><Link to={`/requests/${request.id}`}>{request.position}</Link></td>
                     <td><Badge tone={gradeBadge(request.grade)}>{request.grade}</Badge></td>
                     <td><Badge tone={statusBadge(request.status)}>{statusLabels[request.status]}</Badge></td>
@@ -105,7 +105,6 @@ export function DashboardPage() {
         </Card>
         <Card>
           <h2>Последние кандидаты</h2>
-          <p className="hint">Кандидаты берутся из backend; связь с заявками определяется через assessment.</p>
           {candidatesError ? <div className="alert danger">{candidatesError}</div> : null}
           {requestsLoading ? <div className="loading-line inline">Загружаем кандидатов...</div> : null}
           {!requestsLoading && candidates.length ? (
@@ -128,3 +127,5 @@ export function DashboardPage() {
     </>
   );
 }
+
+

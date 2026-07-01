@@ -1,4 +1,4 @@
-import { Badge } from "../../components/ui/Badge.jsx";
+﻿import { Badge } from "../../components/ui/Badge.jsx";
 import { Card } from "../../components/ui/Card.jsx";
 import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
 
@@ -39,7 +39,7 @@ export function UsersPage() {
         </div>
       </div>
       <Card>
-        <div className="alert warning">Управление пользователями пока не подключено к backend: в OpenAPI нет users endpoints.</div>
+        <div className="alert warning">Управление пользователями пока недоступно.</div>
         {currentUser ? (
           <DataTable>
             <thead><tr><th>Логин</th><th>Роль</th><th>Дата создания</th><th>Действия</th></tr></thead>
@@ -53,9 +53,11 @@ export function UsersPage() {
             </tbody>
           </DataTable>
         ) : (
-          <EmptyState title="Пользователи недоступны" text="Backend endpoint для управления пользователями пока не описан." />
+          <EmptyState title="Пользователи недоступны" text="Раздел будет доступен после подключения управления пользователями." />
         )}
       </Card>
     </>
   );
 }
+
+

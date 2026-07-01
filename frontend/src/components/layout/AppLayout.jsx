@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from "react-router-dom";
+﻿import { NavLink, useNavigate } from "react-router-dom";
 
 const navItems = [
   ["Дашборд", "/dashboard", "bi-grid-1x2"],
@@ -44,7 +44,7 @@ export function AppLayout({ children }) {
         <header className="topbar">
           <div>
             <b>Рабочее пространство</b>
-            <span>Backend API подключён, fallback-разделы помечены явно</span>
+            <span>Подбор специалистов по требованиям заказчика</span>
           </div>
           <div className="user-chip">
             <span>{displayUser.fullName}</span>
@@ -60,3 +60,4 @@ export function AppLayout({ children }) {
     </div>
   );
 }
+

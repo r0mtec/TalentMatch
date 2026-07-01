@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
@@ -9,7 +9,7 @@ import { Pagination, usePagination } from "../../components/ui/Pagination.jsx";
 import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
 import { gradeOptions } from "../../data/mockData.js";
 import { getRequests } from "../../services/requestsApi.js";
-import { formatDate, gradeBadge, statusBadge, statusLabels } from "../../utils/formatters.js";
+import { formatDate, gradeBadge, shortId, statusBadge, statusLabels } from "../../utils/formatters.js";
 
 const statusFilterOptions = ["Активен", "Черновик", "Закрыт"];
 const statusByLabel = { Активен: "active", Черновик: "draft", Закрыт: "closed" };
@@ -39,7 +39,7 @@ export function RequestsPage() {
         const result = await getRequests(params);
         if (!ignore) setRequests(result.items);
       } catch (caught) {
-        if (!ignore) setError(caught.message || "Не удалось загрузить запросы с backend.");
+        if (!ignore) setError(caught.message || "Не удалось загрузить запросы.");
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -87,7 +87,7 @@ export function RequestsPage() {
             <tbody>
               {pagination.pageItems.map((request) => (
                 <tr key={request.id}>
-                  <td>{request.id}</td>
+                  <td>{shortId(request.id)}</td>
                   <td className="entity-name">{request.position}</td>
                   <td><Badge tone={gradeBadge(request.grade)}>{request.grade}</Badge></td>
                   <td>{formatDate(request.createdAt)}</td>
@@ -97,7 +97,7 @@ export function RequestsPage() {
               ))}
             </tbody>
           </DataTable>
-        ) : !loading ? <EmptyState title="Запросы не найдены" text="Попробуйте сбросить фильтры или проверьте backend." /> : null}
+        ) : !loading ? <EmptyState title="Запросы не найдены" text="Попробуйте сбросить фильтры или повторить позже." /> : null}
         {!loading ? (
           <Pagination
             page={pagination.page}
@@ -114,3 +114,6 @@ export function RequestsPage() {
     </>
   );
 }
+
+
+
