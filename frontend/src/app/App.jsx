@@ -6,8 +6,9 @@ import { MockDataProvider } from "../services/mockApi.js";
 export function App() {
   const location = useLocation();
   const user = window.localStorage.getItem("talentmatch_user");
+  const token = window.localStorage.getItem("talentmatch_token");
 
-  if (!user) {
+  if (!user && !token) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 

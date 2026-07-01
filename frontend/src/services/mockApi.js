@@ -58,9 +58,15 @@ const toServerAssessment = (assessment) => ({
   missingMustRequirements: assessment.missingMust,
 });
 
-const attachAssessment = (candidate, requests, technologies) => {
+const getAssessmentRequestId = (candidate) => {
+  const assessments = Array.isArray(candidate.assessments) ? candidate.assessments : candidate.assessment ? [candidate.assessment] : [];
+  return assessments[assessments.length - 1]?.request_id || assessments[assessments.length - 1]?.requestId || null;
+};
+
+const attachAssessment = (candidate, requests, technologies, targetRequestId = null) => {
   const normalized = normalizeSkills(candidate);
-  const request = requests.find((item) => item.id === normalized.requestId);
+  const linkedRequestId = targetRequestId || getAssessmentRequestId(normalized);
+  const request = requests.find((item) => item.id === linkedRequestId);
   if (!request) return { ...normalized, assessment: null };
   const assessment = toServerAssessment(calculateAssessment(request, normalized, technologies));
   const requirementResults = [...request.mustHave, ...request.niceToHave].map((requirement) => {
@@ -80,11 +86,12 @@ const attachAssessment = (candidate, requests, technologies) => {
       updated_at: assessment.calculated_at,
     };
   });
+  const { requestId, request_id, ...candidateWithoutDirectRequest } = normalized;
   return {
-    ...normalized,
-    request_id: normalized.requestId,
+    ...candidateWithoutDirectRequest,
     fio: normalized.fullName,
-    assessment: { ...assessment, candidate_id: normalized.id, request_id: normalized.requestId, requirementResults, assessment_requirement_results: requirementResults },
+    assessment: { ...assessment, candidate_id: normalized.id, request_id: request.id, requirementResults, assessment_requirement_results: requirementResults },
+    assessments: [{ ...assessment, candidate_id: normalized.id, request_id: request.id, requirementResults, assessment_requirement_results: requirementResults }],
   };
 };
 
@@ -104,8 +111,6 @@ const makeCandidateFromFile = (file, request, index, technologies) => {
   }));
   const candidate = {
     id: `cand-${id()}`,
-    requestId: request.id,
-    request_id: request.id,
     fullName: file.name.replace(/\.(pdf|docx)$/i, "") || "Кандидат без имени",
     fio: file.name.replace(/\.(pdf|docx)$/i, "") || "Кандидат без имени",
     grade: request.grade,
@@ -130,7 +135,7 @@ const makeCandidateFromFile = (file, request, index, technologies) => {
   };
   candidate.recognizedSkills = candidate.recognizedSkills.map((skill) => ({ ...skill, candidate_id: candidate.id }));
   candidate.skills = candidate.recognizedSkills;
-  return attachAssessment(candidate, [request], technologies);
+  return attachAssessment(candidate, [request], technologies, request.id);
 };
 
 export function MockDataProvider({ children }) {
@@ -176,7 +181,7 @@ export function MockDataProvider({ children }) {
         run(() => requests.filter((request) => !params.status || request.status === params.status)),
       createRequest: (payloadWithFiles) =>
         run(() => {
-          const { files = [], ...payload } = payloadWithFiles;
+          const { files = [], uploadedCandidates = [], ...payload } = payloadWithFiles;
           const request = {
             ...payload,
             id: payload.id || `REQ-${String(requests.length + 1).padStart(3, "0")}`,
@@ -191,9 +196,14 @@ export function MockDataProvider({ children }) {
             created_at: payload.createdAt || new Date().toISOString().slice(0, 10),
             updated_at: new Date().toISOString().slice(0, 10),
           };
-          const createdCandidates = files.map((file, index) => makeCandidateFromFile(file, request, index, technologies));
+          const backendCandidates = uploadedCandidates
+            .filter((candidate) => candidate?.id)
+            .map((candidate) => attachAssessment(candidate, [request], technologies, request.id));
+          const createdCandidates = backendCandidates.length
+            ? backendCandidates
+            : files.map((file, index) => makeCandidateFromFile(file, request, index, technologies));
           setRequests((items) => [request, ...items.filter((item) => item.id !== request.id)]);
-          setCandidates((items) => [...createdCandidates, ...items.filter((item) => item.requestId !== request.id || !createdCandidates.some((candidate) => candidate.id === item.id))]);
+          setCandidates((items) => [...createdCandidates, ...items.filter((item) => getAssessmentRequestId(item) !== request.id || !createdCandidates.some((candidate) => candidate.id === item.id))]);
           return { request, candidates: createdCandidates };
         }, 520),
       updateRequest: (requestId, payload) =>
@@ -214,12 +224,12 @@ export function MockDataProvider({ children }) {
           setRequests((items) => items.map((item) => (item.id === requestId ? request : item)));
           setCandidates((items) => [
             ...createdCandidates,
-            ...items.map((candidate) => (candidate.requestId === requestId ? attachAssessment(candidate, [request], technologies) : candidate)),
+            ...items.map((candidate) => (getAssessmentRequestId(candidate) === requestId ? attachAssessment(candidate, [request], technologies, requestId) : candidate)),
           ]);
           return { request, candidates: createdCandidates };
         }),
       getCandidates: (params = {}) =>
-        run(() => candidates.filter((candidate) => (!params.requestId || candidate.requestId === params.requestId) && candidate.requestId)),
+        run(() => candidates.filter((candidate) => !params.requestId || getAssessmentRequestId(candidate) === params.requestId)),
       getCandidateById: (candidateId) => run(() => candidates.find((candidate) => candidate.id === candidateId) || null),
       updateCandidateSkills: (candidateId, recognizedSkills) =>
         run(() => {
@@ -244,15 +254,16 @@ export function MockDataProvider({ children }) {
                   sourceText: skill.sourceText || `Навык ${title} добавлен вручную менеджером`,
                 };
               });
-              const request = requests.find((item) => item.id === candidate.requestId);
-              updated = attachAssessment({ ...candidate, recognizedSkills: skills, skills }, request ? [request] : requests, technologies);
+              const requestId = getAssessmentRequestId(candidate);
+              const request = requests.find((item) => item.id === requestId);
+              updated = attachAssessment({ ...candidate, recognizedSkills: skills, skills }, request ? [request] : requests, technologies, requestId);
               return updated;
             }),
           );
           return updated;
         }, 420),
       getAssessmentsByRequest: (requestId) =>
-        run(() => candidates.filter((candidate) => candidate.requestId === requestId).map((candidate) => ({ candidateId: candidate.id, assessment: candidate.assessment }))),
+        run(() => candidates.filter((candidate) => getAssessmentRequestId(candidate) === requestId).map((candidate) => ({ candidateId: candidate.id, assessment: candidate.assessment }))),
       reassessCandidateForRequest: (candidateId, targetRequestId) =>
         run(() => {
           const source = candidates.find((candidate) => candidate.id === candidateId);
@@ -261,11 +272,9 @@ export function MockDataProvider({ children }) {
           const copy = attachAssessment({
             ...source,
             id: `cand-${id()}`,
-            requestId: request.id,
-            request_id: request.id,
             created_at: new Date().toISOString().slice(0, 10),
             updated_at: new Date().toISOString().slice(0, 10),
-          }, [request], technologies);
+          }, [request], technologies, request.id);
           setCandidates((items) => [copy, ...items]);
           return copy;
         }, 480),

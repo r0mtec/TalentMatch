@@ -166,7 +166,6 @@ export const candidates = [
     location: "Москва",
     uploadedAt: "2026-06-15",
     fileName: "ivanov_backend.pdf",
-    requestId: "REQ-001",
     skills: [
       skill("skill-1", "php", "PHP", "Опыт коммерческой разработки на PHP 8"),
       skill("skill-2", "laravel", "Laravel", "Разработка сервисов на Laravel"),
@@ -182,7 +181,6 @@ export const candidates = [
     location: "Санкт-Петербург",
     uploadedAt: "2026-06-18",
     fileName: "petrova_frontend.docx",
-    requestId: "REQ-002",
     skills: [
       skill("skill-6", "react", "React", "Разработка интерфейсов на React"),
       skill("skill-7", "typescript", "TypeScript", "Типизация клиентских модулей"),
@@ -197,7 +195,6 @@ export const candidates = [
     location: "Екатеринбург",
     uploadedAt: "2026-06-16",
     fileName: "sidorov_devops.pdf",
-    requestId: "REQ-003",
     skills: [
       skill("skill-10", "docker", "Docker", "Сборка Docker-образов"),
       skill("skill-11", "kubernetes", "Kubernetes", "Поддержка production Kubernetes"),
@@ -212,7 +209,6 @@ export const candidates = [
     location: "Новосибирск",
     uploadedAt: "2026-06-13",
     fileName: "kozlova_ds.pdf",
-    requestId: "REQ-004",
     skills: [
       skill("skill-14", "python", "Python", "ML-проекты на Python"),
       skill("skill-15", "django", "Django", "Backend на Django"),
@@ -227,7 +223,6 @@ export const candidates = [
     location: "Удалённо",
     uploadedAt: "2026-06-09",
     fileName: "novikov_backend.docx",
-    requestId: "REQ-001",
     skills: [
       skill("skill-18", "php", "PHP", "Поддержка PHP-приложений"),
       skill("skill-19", "symfony", "Symfony", "Symfony backend"),
@@ -254,7 +249,6 @@ requests.forEach((request) => {
 });
 
 candidates.forEach((candidate) => {
-  candidate.request_id = candidate.requestId;
   candidate.fio = candidate.fullName;
   candidate.citizenship = candidate.citizenship || "РФ";
   candidate.languages = candidate.languages || "Русский";

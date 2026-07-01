@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
 import { Card } from "../../components/ui/Card.jsx";
@@ -9,18 +9,53 @@ import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
 import { useToast } from "../../components/ui/Toast.jsx";
 import { technologyGroups } from "../../data/mockData.js";
 import { useMockApi } from "../../services/mockApi.js";
+import {
+  addTechnologySynonym,
+  createTechnology as createBackendTechnology,
+  deleteTechnology as deleteBackendTechnology,
+  deleteTechnologySynonym,
+  getTechnologies,
+  updateTechnology as updateBackendTechnology,
+} from "../../services/technologiesApi.js";
 import { groupLabels } from "../../utils/formatters.js";
 
 const blank = { name: "", group: "languages", synonyms: "" };
 
 export function DictionaryPage() {
-  const { technologies, createTechnology, updateTechnology, deleteTechnology, loading } = useMockApi();
+  const { technologies: mockTechnologies, createTechnology, updateTechnology, deleteTechnology, loading } = useMockApi();
   const { notify } = useToast();
+  const [technologies, setTechnologies] = useState([]);
+  const [usingMockFallback, setUsingMockFallback] = useState(false);
+  const [apiError, setApiError] = useState("");
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState(blank);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [collapsedGroups, setCollapsedGroups] = useState({});
+
+  useEffect(() => {
+    let ignore = false;
+    const load = async () => {
+      setApiError("");
+      try {
+        const items = await getTechnologies({ include_inactive: true });
+        if (!ignore) {
+          setTechnologies(items);
+          setUsingMockFallback(false);
+        }
+      } catch (caught) {
+        if (!ignore) {
+          setTechnologies(mockTechnologies);
+          setUsingMockFallback(true);
+          setApiError(caught.message || "Не удалось загрузить справочник с backend.");
+        }
+      }
+    };
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [mockTechnologies]);
 
   const grouped = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -41,6 +76,16 @@ export function DictionaryPage() {
     setModal(true);
   };
 
+  const syncBackendSynonyms = async (technology, nextSynonyms) => {
+    const currentItems = technology.synonymItems || [];
+    const currentValues = currentItems.map((item) => item.synonym.toLowerCase());
+    const nextValues = nextSynonyms.map((item) => item.toLowerCase());
+    const additions = nextSynonyms.filter((item) => !currentValues.includes(item.toLowerCase()));
+    const removals = currentItems.filter((item) => !nextValues.includes(item.synonym.toLowerCase()) && item.id);
+    await Promise.all(additions.map((synonym) => addTechnologySynonym(technology.id, synonym)));
+    await Promise.all(removals.map((synonym) => deleteTechnologySynonym(synonym.id)));
+  };
+
   const submit = async () => {
     if (!form.name.trim()) return;
     const payload = {
@@ -49,16 +94,33 @@ export function DictionaryPage() {
       synonyms: form.synonyms.split(",").map((item) => item.trim()).filter(Boolean),
     };
     if (form.id) {
-      await updateTechnology(form.id, payload);
+      if (usingMockFallback) {
+        await updateTechnology(form.id, payload);
+      } else {
+        await updateBackendTechnology(form.id, payload);
+        await syncBackendSynonyms(form, payload.synonyms);
+        setTechnologies(await getTechnologies({ include_inactive: true }));
+      }
     } else {
-      await createTechnology(payload);
+      if (usingMockFallback) {
+        await createTechnology(payload);
+      } else {
+        const created = await createBackendTechnology(payload);
+        await syncBackendSynonyms(created, payload.synonyms);
+        setTechnologies(await getTechnologies({ include_inactive: true }));
+      }
     }
     notify("Технология сохранена.");
     setModal(false);
   };
 
   const remove = async () => {
-    await deleteTechnology(pendingDelete.id);
+    if (usingMockFallback) {
+      await deleteTechnology(pendingDelete.id);
+    } else {
+      await deleteBackendTechnology(pendingDelete.id);
+      setTechnologies(await getTechnologies({ include_inactive: true }));
+    }
     notify("Технология удалена.");
     setPendingDelete(null);
   };
@@ -70,6 +132,7 @@ export function DictionaryPage() {
         <Button icon="bi-plus-lg" onClick={() => openForm(null)}>Добавить технологию</Button>
       </div>
       <Card>
+        {usingMockFallback ? <div className="alert warning">Справочник показан в mock-режиме: {apiError}</div> : null}
         <div className="filters">
           <Input placeholder="Поиск по названию и синонимам" value={query} onChange={(event) => setQuery(event.target.value)} />
         </div>
