@@ -33,6 +33,11 @@
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
+- `GET /api/users` — только `admin`
+- `POST /api/users` — только `admin`
+- `GET /api/users/{id}` — только `admin`
+- `PATCH /api/users/{id}` — только `admin`
+- `DELETE /api/users/{id}` — только `admin`
 - `GET /api/requests`
 - `POST /api/requests`
 - `GET /api/requests/{id}`
