@@ -8,7 +8,7 @@ import { login as backendLogin } from "../../services/authApi.js";
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [login, setLogin] = useState("anna.smirnova");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);

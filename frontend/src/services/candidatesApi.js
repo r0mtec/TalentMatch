@@ -1,7 +1,30 @@
 ﻿import { apiRequest } from "./apiClient.js";
-import { mapBackendCandidateToFrontend } from "./mappers/candidateMapper.js";
-import { mapBackendCandidateSkillToFrontend } from "./mappers/candidateMapper.js";
+import { mapBackendAssessmentToFrontend, mapBackendCandidateToFrontend, mapBackendCandidateSkillToFrontend } from "./mappers/candidateMapper.js";
 import { isValidUuid } from "./mappers/requestMapper.js";
+
+const defaultManualSkillConfidence = 100;
+
+const normalizedManualConfidence = (value) => {
+  if (value === undefined || value === null || value === "") return defaultManualSkillConfidence;
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) return defaultManualSkillConfidence;
+  return Math.max(0, Math.min(100, Math.round(numberValue)));
+};
+
+export function mapManualSkillToBackendPayload(skill = {}) {
+  const rawText = String(skill.raw_text || skill.title || "").trim();
+  if (!rawText) return null;
+  const technologyId = skill.technology_id || skill.technologyId;
+  const evidenceText = skill.evidence_text ?? skill.sourceText ?? skill.text_source ?? null;
+
+  return {
+    technology_id: isValidUuid(technologyId) ? technologyId : null,
+    raw_text: rawText,
+    normalized_name: String(skill.normalized_name || rawText).trim().toLowerCase(),
+    evidence_text: evidenceText === "" ? null : evidenceText,
+    confidence: normalizedManualConfidence(skill.confidence),
+  };
+}
 
 export async function getCandidates(params = {}) {
   const payload = await apiRequest("/candidates", { query: params });
@@ -9,8 +32,35 @@ export async function getCandidates(params = {}) {
   return data.map(mapBackendCandidateToFrontend);
 }
 
+export async function getAllCandidates(params = {}) {
+  const firstPayload = await apiRequest("/candidates", { query: { ...params, page: 1, per_page: params.per_page || 100 } });
+  const firstData = Array.isArray(firstPayload) ? firstPayload : firstPayload?.data || [];
+  const items = firstData.map(mapBackendCandidateToFrontend);
+  const lastPage = Number(firstPayload?.last_page || firstPayload?.meta?.last_page || 1);
+
+  for (let page = 2; page <= lastPage; page += 1) {
+    const payload = await apiRequest("/candidates", { query: { ...params, page, per_page: params.per_page || 100 } });
+    const data = Array.isArray(payload) ? payload : payload?.data || [];
+    items.push(...data.map(mapBackendCandidateToFrontend));
+  }
+
+  return items;
+}
+
 export async function getCandidateById(id) {
   const payload = await apiRequest(`/candidates/${id}`);
+  return mapBackendCandidateToFrontend(payload);
+}
+
+export async function updateCandidate(id, candidate) {
+  const payload = await apiRequest(`/candidates/${id}`, {
+    method: "PATCH",
+    body: {
+      grade: candidate.grade || null,
+      location: candidate.location || null,
+      citizenship: candidate.citizenship || null,
+    },
+  });
   return mapBackendCandidateToFrontend(payload);
 }
 
@@ -20,47 +70,44 @@ export async function getCandidateSkills(candidateId) {
   return data.map(mapBackendCandidateSkillToFrontend);
 }
 
-// TODO: document-parser-service and skill-recognition-service are internal backend services; browser uses /candidates/upload and reads returned processing statuses/skills.
-export async function uploadCandidateResume(file, fields = {}) {
+// Parser and skill recognition are internal services; browser upload flows read returned processing statuses and skills.
+export async function batchUploadCandidateResumes(files, fields = {}) {
   const formData = new FormData();
-  formData.append("resume", file);
+  Array.from(files || []).forEach((file) => formData.append("resumes[]", file));
   Object.entries(fields).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") formData.append(key, value);
   });
 
-  const payload = await apiRequest("/candidates/upload", {
+  const payload = await apiRequest("/candidates/batch-upload", {
     method: "POST",
     body: formData,
   });
-  return mapBackendCandidateToFrontend(payload);
+
+  return {
+    items: (payload?.candidates || []).map((item) => ({
+      candidate: mapBackendCandidateToFrontend(item.candidate || item),
+      assessment: item.assessment ? mapBackendAssessmentToFrontend(item.assessment) : null,
+    })),
+    errors: payload?.errors || [],
+  };
 }
 
 export async function createCandidateSkill(candidateId, skill) {
-  const technologyId = skill.technology_id || skill.technologyId;
+  const body = mapManualSkillToBackendPayload(skill);
+  if (!body) throw new Error("Навык не заполнен.");
   const payload = await apiRequest(`/candidates/${candidateId}/skills`, {
     method: "POST",
-    body: {
-      technology_id: isValidUuid(technologyId) ? technologyId : null,
-      raw_text: skill.raw_text || skill.title || "",
-      normalized_name: skill.normalized_name || String(skill.title || skill.raw_text || "").toLowerCase(),
-      evidence_text: skill.evidence_text || skill.sourceText || skill.text_source || null,
-      confidence: skill.confidence || null,
-    },
+    body,
   });
   return mapBackendCandidateSkillToFrontend(payload);
 }
 
 export async function updateCandidateSkill(skillId, skill) {
-  const technologyId = skill.technology_id || skill.technologyId;
+  const body = mapManualSkillToBackendPayload(skill);
+  if (!body) throw new Error("Навык не заполнен.");
   const payload = await apiRequest(`/candidate-skills/${skillId}`, {
     method: "PATCH",
-    body: {
-      technology_id: isValidUuid(technologyId) ? technologyId : null,
-      raw_text: skill.raw_text || skill.title || "",
-      normalized_name: skill.normalized_name || String(skill.title || skill.raw_text || "").toLowerCase(),
-      evidence_text: skill.evidence_text || skill.sourceText || skill.text_source || null,
-      confidence: skill.confidence || null,
-    },
+    body,
   });
   return mapBackendCandidateSkillToFrontend(payload);
 }

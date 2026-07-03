@@ -1,20 +1,21 @@
-﻿import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { canAccess, getStoredUser, roleLabels } from "../../utils/access.js";
 
 const navItems = [
-  ["Дашборд", "/dashboard", "bi-grid-1x2"],
-  ["Запросы", "/requests", "bi-file-text"],
-  ["Кандидаты", "/candidates", "bi-people"],
-  ["Сравнение", "/comparison", "bi-bar-chart"],
-  ["Справочник", "/dictionary", "bi-book"],
-  ["Пользователи", "/users", "bi-person-gear", "admin"],
+  ["Дашборд", "/dashboard", "bi-grid-1x2", "dashboard"],
+  ["Запросы", "/requests", "bi-file-text", "requests"],
+  ["Кандидаты", "/candidates", "bi-people", "candidates"],
+  ["Сравнение", "/comparison", "bi-bar-chart", "comparison"],
+  ["Справочник", "/dictionary", "bi-book", "dictionary"],
+  ["Пользователи", "/users", "bi-person-gear", "users"],
+  ["Правила оценки", "/rules", "bi-sliders", "rules"],
 ];
 
 export function AppLayout({ children }) {
   const navigate = useNavigate();
-  const storedUser = JSON.parse(window.localStorage.getItem("talentmatch_user") || "null");
+  const storedUser = getStoredUser();
   const displayUser = {
     fullName: storedUser?.name || storedUser?.login || "Пользователь",
-    initials: storedUser?.initials || String(storedUser?.login || "TM").slice(0, 2).toUpperCase(),
     role: storedUser?.role || "account_manager",
   };
 
@@ -32,7 +33,7 @@ export function AppLayout({ children }) {
           <span>TalentMatch</span>
         </div>
         <nav className="nav">
-          {navItems.filter(([, , , role]) => !role || role === displayUser.role).map(([label, to, icon]) => (
+          {navItems.filter(([, , , scope]) => canAccess(scope, displayUser.role)).map(([label, to, icon]) => (
             <NavLink key={to} to={to} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
               <i className={`bi ${icon}`} aria-hidden="true" />
               {label}
@@ -47,8 +48,7 @@ export function AppLayout({ children }) {
             <span>Подбор специалистов по требованиям заказчика</span>
           </div>
           <div className="user-chip">
-            <span>{displayUser.fullName}</span>
-            <span className="avatar">{displayUser.initials}</span>
+            <span>{displayUser.fullName} · {roleLabels[displayUser.role] || displayUser.role}</span>
             <button type="button" className="logout-button" onClick={logout}>
               <i className="bi bi-box-arrow-right" aria-hidden="true" />
               Выйти

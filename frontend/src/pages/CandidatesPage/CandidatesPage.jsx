@@ -11,7 +11,7 @@ import { getAssessmentsByRequest } from "../../services/assessmentsApi.js";
 import { getCandidates } from "../../services/candidatesApi.js";
 import { attachAssessmentsToCandidates, getAssessmentRequestId, getPrimaryAssessment } from "../../services/mappers/candidateMapper.js";
 import { getRequests } from "../../services/requestsApi.js";
-import { formatDate, gradeBadge, requestOptionLabel, requestTitle } from "../../utils/formatters.js";
+import { formatDate, gradeBadge, requestOptionLabel } from "../../utils/formatters.js";
 
 export function CandidatesPage() {
   const navigate = useNavigate();
@@ -98,7 +98,7 @@ export function CandidatesPage() {
                     <tr key={candidate.id}>
                       <td className="entity-name">{candidate.fullName || candidate.fileName || "Кандидат без имени"}</td>
                       <td><Badge tone={gradeBadge(candidate.grade)}>{candidate.grade}</Badge></td>
-                      <td>{assessment && request ? requestTitle(request) : "Оценка не выполнена"}</td>
+                      <td>{assessment && request ? requestOptionLabel(request) : "Оценка не выполнена"}</td>
                       <td>
                         {skills.length ? (
                           <div className="tag-row">

@@ -25,11 +25,11 @@ const normalizeValidationErrors = (payload) => {
 
 const extractErrorMessage = (payload, status) => {
   if (status === 422) return "Ошибка валидации. Проверьте поля заявки.";
-  if (payload?.message) return payload.message;
-  if (payload?.error) return payload.error;
   if (status === 401) return "Требуется авторизация.";
   if (status === 404) return "Запись не найдена.";
   if (status >= 500) return "Сервер временно недоступен.";
+  if (payload?.message) return payload.message;
+  if (payload?.error) return payload.error;
   return "Не удалось выполнить запрос.";
 };
 
@@ -72,6 +72,7 @@ export async function apiRequest(path, options = {}) {
   const payload = await parseResponse(response);
   if (!response.ok) {
     if (response.status === 422) console.debug("Backend validation error", payload);
+    if (response.status >= 500) console.debug("Backend server error", payload);
     if (response.status === 401) {
       window.localStorage.removeItem("talentmatch_token");
       window.localStorage.removeItem("talentmatch_user");

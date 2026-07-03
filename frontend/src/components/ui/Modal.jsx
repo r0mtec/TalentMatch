@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Button } from "./Button.jsx";
 
-export function Modal({ title, children, onClose }) {
+export function Modal({ title, children, onClose, className = "" }) {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === "Escape") onClose();
@@ -12,7 +12,7 @@ export function Modal({ title, children, onClose }) {
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onMouseDown={onClose}>
-      <div className="modal" onMouseDown={(event) => event.stopPropagation()}>
+      <div className={`modal ${className}`.trim()} onMouseDown={(event) => event.stopPropagation()}>
         <div className="modal-head">
           <h2>{title}</h2>
           <Button variant="ghost" onClick={onClose} aria-label="Закрыть">×</Button>

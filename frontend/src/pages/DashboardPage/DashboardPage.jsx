@@ -7,7 +7,7 @@ import { getAssessmentsByRequest } from "../../services/assessmentsApi.js";
 import { getCandidates } from "../../services/candidatesApi.js";
 import { attachAssessmentsToCandidates, getCandidateAssessments } from "../../services/mappers/candidateMapper.js";
 import { getRequests } from "../../services/requestsApi.js";
-import { formatDate, gradeBadge, shortId, statusBadge, statusLabels } from "../../utils/formatters.js";
+import { formatDate, gradeBadge, isAssessmentCalculated, shortId, statusBadge, statusLabels } from "../../utils/formatters.js";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -49,8 +49,11 @@ export function DashboardPage() {
     };
   }, []);
   const assessments = candidates.flatMap(getCandidateAssessments);
-  const avg = assessments.length ? Math.round(assessments.reduce((sum, item) => sum + item.totalCoverage, 0) / assessments.length) : 0;
-  const incomplete = assessments.filter((item) => item.hasMissingMustRequirements || item.missingMustRequirements?.length > 0).length;
+  const calculatedAssessments = assessments.filter(isAssessmentCalculated);
+  const avg = calculatedAssessments.length
+    ? `${Math.round(calculatedAssessments.reduce((sum, item) => sum + item.totalCoverage, 0) / calculatedAssessments.length)}%`
+    : "—";
+  const incomplete = calculatedAssessments.filter((item) => item.hasMissingMustRequirements || item.missingMustRequirements?.length > 0).length;
 
   const quickActions = [
     { title: "Создать запрос", text: "Открыть форму нового запроса", icon: "bi-plus-lg", to: "/requests/new" },
@@ -80,7 +83,7 @@ export function DashboardPage() {
       <div className="metric-grid">
         <Card><span>Активные запросы</span><strong>{requests.filter((item) => item.status === "active").length}</strong></Card>
         <Card><span>Кандидаты</span><strong>{candidates.length}</strong></Card>
-        <Card><span>Среднее покрытие</span><strong>{avg}%</strong></Card>
+        <Card><span>Среднее покрытие</span><strong>{avg}</strong></Card>
         <Card><span>Неполный must have</span><strong>{incomplete}</strong></Card>
       </div>
       <div className="two-col">

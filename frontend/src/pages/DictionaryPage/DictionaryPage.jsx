@@ -1,4 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
 import { Card } from "../../components/ui/Card.jsx";
@@ -15,11 +16,15 @@ import {
   deleteTechnology as deleteBackendTechnology,
   deleteTechnologySynonym,
   getTechnologies,
+  getUnrecognizedTerms,
+  promoteUnrecognizedTerm,
   updateTechnology as updateBackendTechnology,
+  updateTechnologySynonym,
 } from "../../services/technologiesApi.js";
-import { groupLabels } from "../../utils/formatters.js";
+import { formatDate, groupLabels } from "../../utils/formatters.js";
+import { filterVisibleUnrecognizedTerms, markUnrecognizedTermsSeen, readIgnoredTerms, termKey, writeIgnoredTerms } from "../../utils/unrecognizedTerms.js";
 
-const blank = { name: "", group: "languages", synonyms: [], synonymDraft: "" };
+const blank = { name: "", group: "languages", synonyms: [], synonymDraft: "", sourceTermId: null };
 
 const normalizeSynonyms = (items = []) => {
   const seen = new Set();
@@ -33,7 +38,23 @@ const normalizeSynonyms = (items = []) => {
   }, []);
 };
 
+const clip = (value, limit = 96) => {
+  const text = String(value || "").trim();
+  if (!text) return "—";
+  return text.length > limit ? `${text.slice(0, limit)}...` : text;
+};
+
+const formatOptionalDate = (date) => (date ? formatDate(date) : "—");
+
+const candidateLabel = (value) => {
+  const text = String(value || "").trim();
+  if (!text || text.includes("=?")) return "Кандидат без имени";
+  return text;
+};
+
 export function DictionaryPage() {
+  const location = useLocation();
+  const unrecognizedRef = useRef(null);
   const { technologies: mockTechnologies, createTechnology, updateTechnology, deleteTechnology, loading } = useMockApi();
   const { notify } = useToast();
   const [technologies, setTechnologies] = useState([]);
@@ -44,29 +65,41 @@ export function DictionaryPage() {
   const [form, setForm] = useState(blank);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [unrecognizedTerms, setUnrecognizedTerms] = useState([]);
+  const [termsLoading, setTermsLoading] = useState(false);
+  const [ignoredTerms, setIgnoredTerms] = useState(readIgnoredTerms);
+  const [contextTerm, setContextTerm] = useState(null);
+  const [highlightUnrecognized, setHighlightUnrecognized] = useState(false);
+
+  const loadUnrecognizedTerms = async () => {
+    setTermsLoading(true);
+    try {
+      const result = await getUnrecognizedTerms({ status: "new", per_page: 200 });
+      setUnrecognizedTerms(result.items);
+    } catch {
+      setUnrecognizedTerms([]);
+    } finally {
+      setTermsLoading(false);
+    }
+  };
+
+  const loadTechnologies = async () => {
+    setApiError("");
+    try {
+      const items = await getTechnologies({ include_inactive: true });
+      setTechnologies(items);
+      setUsingMockFallback(false);
+      await loadUnrecognizedTerms();
+    } catch (caught) {
+      setTechnologies(mockTechnologies);
+      setUsingMockFallback(true);
+      setUnrecognizedTerms([]);
+      setApiError(caught.message || "Не удалось загрузить справочник.");
+    }
+  };
 
   useEffect(() => {
-    let ignore = false;
-    const load = async () => {
-      setApiError("");
-      try {
-        const items = await getTechnologies({ include_inactive: true });
-        if (!ignore) {
-          setTechnologies(items);
-          setUsingMockFallback(false);
-        }
-      } catch (caught) {
-        if (!ignore) {
-          setTechnologies(mockTechnologies);
-          setUsingMockFallback(true);
-          setApiError(caught.message || "Не удалось загрузить справочник.");
-        }
-      }
-    };
-    load();
-    return () => {
-      ignore = true;
-    };
+    loadTechnologies();
   }, [mockTechnologies]);
 
   const grouped = useMemo(() => {
@@ -83,8 +116,38 @@ export function DictionaryPage() {
       .filter((section) => section.items.length > 0);
   }, [query, technologies]);
 
+  const visibleUnrecognizedTerms = useMemo(() => {
+    return filterVisibleUnrecognizedTerms(unrecognizedTerms, ignoredTerms);
+  }, [ignoredTerms, unrecognizedTerms]);
+  const termPagination = usePagination(visibleUnrecognizedTerms, 5);
+  const shouldFocusUnrecognized = location.hash === "#unrecognized"
+    || location.hash === "#unrecognized-terms"
+    || new URLSearchParams(location.search).get("section") === "unrecognized";
+
+  useEffect(() => {
+    if (!shouldFocusUnrecognized || usingMockFallback || termsLoading) return undefined;
+    const timer = window.setTimeout(() => {
+      unrecognizedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setHighlightUnrecognized(true);
+      markUnrecognizedTermsSeen(visibleUnrecognizedTerms);
+      window.setTimeout(() => setHighlightUnrecognized(false), 1800);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [shouldFocusUnrecognized, termsLoading, usingMockFallback, visibleUnrecognizedTerms]);
+
   const openForm = (technology) => {
-    setForm(technology ? { ...technology, synonyms: normalizeSynonyms(technology.synonyms), synonymDraft: "" } : blank);
+    setForm(technology ? { ...technology, synonyms: normalizeSynonyms(technology.synonyms), synonymDraft: "", sourceTermId: null } : { ...blank });
+    setModal(true);
+  };
+
+  const openPromoteForm = (term) => {
+    setForm({
+      ...blank,
+      name: term.term,
+      group: "other",
+      synonyms: normalizeSynonyms([term.term]),
+      sourceTermId: term.id,
+    });
     setModal(true);
   };
 
@@ -99,40 +162,56 @@ export function DictionaryPage() {
 
   const syncBackendSynonyms = async (technology, nextSynonyms) => {
     const currentItems = technology.synonymItems || [];
-    const currentValues = currentItems.map((item) => item.synonym.toLowerCase());
-    const nextValues = nextSynonyms.map((item) => item.toLowerCase());
-    const additions = nextSynonyms.filter((item) => !currentValues.includes(item.toLowerCase()));
-    const removals = currentItems.filter((item) => !nextValues.includes(item.synonym.toLowerCase()) && item.id);
+    const key = (value) => String(value || "").trim().toLowerCase();
+    const currentKeys = new Set(currentItems.map((item) => key(item.synonym)));
+    const nextKeys = new Set(nextSynonyms.map(key));
+    const changedCurrent = currentItems.filter((item) => !nextKeys.has(key(item.synonym)) && item.id);
+    const changedNext = nextSynonyms.filter((item) => !currentKeys.has(key(item)));
+    const updates = changedNext.slice(0, changedCurrent.length).map((synonym, index) => ({
+      id: changedCurrent[index].id,
+      synonym,
+    }));
+    const additions = changedNext.slice(changedCurrent.length);
+    const removals = changedCurrent.slice(changedNext.length);
+    await Promise.all(updates.map((item) => updateTechnologySynonym(item.id, item.synonym)));
     await Promise.all(additions.map((synonym) => addTechnologySynonym(technology.id, synonym)));
     await Promise.all(removals.map((synonym) => deleteTechnologySynonym(synonym.id)));
   };
 
   const submit = async () => {
     if (!form.name.trim()) return;
+    setApiError("");
     const payload = {
       ...form,
       name: form.name.trim(),
       synonyms: normalizeSynonyms(form.synonyms),
     };
-    if (form.id) {
-      if (usingMockFallback) {
-        await updateTechnology(form.id, payload);
+    try {
+      if (form.id) {
+        if (usingMockFallback) {
+          await updateTechnology(form.id, payload);
+        } else {
+          await updateBackendTechnology(form.id, payload);
+          await syncBackendSynonyms(form, payload.synonyms);
+          await loadTechnologies();
+        }
       } else {
-        await updateBackendTechnology(form.id, payload);
-        await syncBackendSynonyms(form, payload.synonyms);
-        setTechnologies(await getTechnologies({ include_inactive: true }));
+        if (usingMockFallback) {
+          await createTechnology(payload);
+        } else if (form.sourceTermId) {
+          await promoteUnrecognizedTerm(form.sourceTermId, payload);
+          await loadTechnologies();
+        } else {
+          const created = await createBackendTechnology(payload);
+          await syncBackendSynonyms(created, payload.synonyms);
+          await loadTechnologies();
+        }
       }
-    } else {
-      if (usingMockFallback) {
-        await createTechnology(payload);
-      } else {
-        const created = await createBackendTechnology(payload);
-        await syncBackendSynonyms(created, payload.synonyms);
-        setTechnologies(await getTechnologies({ include_inactive: true }));
-      }
+      notify(form.sourceTermId ? "Термин добавлен в справочник." : "Технология сохранена.");
+      setModal(false);
+    } catch (caught) {
+      setApiError(caught.message || "Не удалось сохранить технологию.");
     }
-    notify("Технология сохранена.");
-    setModal(false);
   };
 
   const remove = async () => {
@@ -140,10 +219,18 @@ export function DictionaryPage() {
       await deleteTechnology(pendingDelete.id);
     } else {
       await deleteBackendTechnology(pendingDelete.id);
-      setTechnologies(await getTechnologies({ include_inactive: true }));
+      await loadTechnologies();
     }
     notify("Технология удалена.");
     setPendingDelete(null);
+  };
+
+  const ignoreTerm = (term) => {
+    const key = termKey(term.term);
+    const next = Array.from(new Set([...ignoredTerms, key])).filter(Boolean);
+    writeIgnoredTerms(next);
+    setIgnoredTerms(next);
+    notify("Термин скрыт из списка.");
   };
 
   return (
@@ -173,8 +260,59 @@ export function DictionaryPage() {
           </div>
         ) : <EmptyState title="Технологии не найдены" text="Добавьте новую технологию или измените поиск." />}
       </Card>
+      {!usingMockFallback ? (
+        <div id="unrecognized" ref={unrecognizedRef}>
+        <span id="unrecognized-terms" className="anchor-target" aria-hidden="true" />
+        <Card className={`resume-card ${highlightUnrecognized ? "highlight-card" : ""}`}>
+          <div className="section-head">
+            <div>
+              <h2>Нераспознанные термины</h2>
+              <p className="hint">Новые слова из резюме, которые можно добавить в справочник технологий</p>
+            </div>
+            {termsLoading ? <Badge>Загрузка</Badge> : <Badge>{visibleUnrecognizedTerms.length}</Badge>}
+          </div>
+          {termsLoading ? <div className="loading-line inline">Загружаем термины...</div> : null}
+          {!termsLoading && visibleUnrecognizedTerms.length ? (
+            <>
+              <DataTable>
+                <thead><tr><th>Термин</th><th>Контекст</th><th>Кандидат</th><th>Дата</th><th>Действие</th></tr></thead>
+                <tbody>
+                  {termPagination.pageItems.map((term) => (
+                    <tr key={term.id}>
+                      <td className="entity-name">{term.term}</td>
+                      <td className="term-context-preview">{clip(term.context)}</td>
+                      <td>{candidateLabel(term.candidateName)}</td>
+                      <td>{formatOptionalDate(term.createdAt)}</td>
+                      <td className="table-actions">
+                        <Button variant="secondary" icon="bi-eye" onClick={() => setContextTerm(term)}>Контекст</Button>
+                        <Button variant="secondary" icon="bi-arrow-up-circle" onClick={() => openPromoteForm(term)}>В технологию</Button>
+                        <Button variant="ghost" icon="bi-eye-slash" onClick={() => ignoreTerm(term)}>Игнорировать</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </DataTable>
+              <Pagination
+                page={termPagination.page}
+                pageSize={termPagination.pageSize}
+                totalPages={termPagination.totalPages}
+                start={termPagination.start}
+                end={termPagination.end}
+                total={termPagination.total}
+                onPageChange={termPagination.setPage}
+                onPageSizeChange={termPagination.setPageSize}
+              />
+            </>
+          ) : null}
+          {!termsLoading && !visibleUnrecognizedTerms.length ? (
+            <EmptyState title="Новых терминов нет" text="Когда распознаватель найдёт незнакомые слова, они появятся здесь." />
+          ) : null}
+        </Card>
+        </div>
+      ) : null}
       {modal ? (
         <Modal title="Технология" onClose={() => setModal(false)}>
+          {apiError ? <div className="alert danger">{apiError}</div> : null}
           <Field label="Название"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
           <Field label="Группа">
             <Select value={form.group} onChange={(event) => setForm({ ...form, group: event.target.value })}>
@@ -207,6 +345,22 @@ export function DictionaryPage() {
           <div className="actions-bar">
             <Button icon="bi-check2" disabled={loading} onClick={submit}>{loading ? "Сохраняем..." : "Сохранить"}</Button>
             <Button variant="ghost" onClick={() => setModal(false)}>Отмена</Button>
+          </div>
+        </Modal>
+      ) : null}
+      {contextTerm ? (
+        <Modal title="Контекст термина" className="wide-modal" onClose={() => setContextTerm(null)}>
+          <div className="term-context-modal">
+            <div className="detail-grid">
+              <span><b>Термин:</b> {contextTerm.term}</span>
+              <span><b>Кандидат:</b> {candidateLabel(contextTerm.candidateName)}</span>
+              <span><b>Дата:</b> {formatOptionalDate(contextTerm.createdAt)}</span>
+              {contextTerm.source ? <span><b>Источник:</b> {contextTerm.source}</span> : null}
+            </div>
+            <div className="context-text">{contextTerm.context || "Контекст не передан."}</div>
+            <div className="modal-actions">
+              <Button variant="secondary" onClick={() => setContextTerm(null)}>Закрыть</Button>
+            </div>
           </div>
         </Modal>
       ) : null}
