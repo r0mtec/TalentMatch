@@ -261,7 +261,13 @@ paths:
       parameters:
         - { name: q, in: query, description: Поиск по display_name/original_file_name/parsed_text, schema: { type: string } }
         - { name: technology_id, in: query, schema: { type: string, format: uuid } }
-        - { name: technology_ids[], in: query, schema: { type: array, items: { type: string, format: uuid } } }
+        - name: "technology_ids[]"
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
         - { name: grade, in: query, schema: { type: string } }
         - { name: location, in: query, schema: { type: string } }
         - { name: parsing_status, in: query, schema: { type: string, enum: [uploaded, processing, parsed, failed] } }
@@ -641,7 +647,7 @@ paths:
   /internal/documents/parse:
     post:
       tags: [Internal]
-      summary: Internal: извлечь plain_text из resume-файла
+      summary: "Internal: извлечь plain_text из resume-файла"
       security: []
       requestBody:
         required: true
@@ -661,7 +667,7 @@ paths:
   /internal/skills/recognize:
     post:
       tags: [Internal]
-      summary: Internal: распознать навыки по plain_text
+      summary: "Internal: распознать навыки по plain_text"
       security: []
       requestBody:
         required: true
@@ -681,7 +687,7 @@ paths:
   /internal/assessments/calculate:
     post:
       tags: [Internal]
-      summary: Internal: рассчитать покрытие требований навыками кандидата
+      summary: "Internal: рассчитать покрытие требований навыками кандидата"
       security: []
       requestBody:
         required: true
@@ -701,7 +707,7 @@ paths:
   /internal/reports/assessment:
     post:
       tags: [Internal]
-      summary: Internal: сформировать PDF-отчет по assessment
+      summary: "Internal: сформировать PDF-отчет по assessment"
       security: []
       requestBody:
         required: true
@@ -722,7 +728,7 @@ paths:
   /internal/reports/comparison:
     post:
       tags: [Internal]
-      summary: Internal: сформировать PDF-отчет сравнения кандидатов
+      summary: "Internal: сформировать PDF-отчет сравнения кандидатов"
       security: []
       requestBody:
         required: true

@@ -3,13 +3,16 @@
 namespace Tests\Feature;
 
 use App\Jobs\CalculateAssessmentJob;
+use App\Models\Assessment;
 use App\Models\Candidate;
 use App\Models\CustomerRequest;
 use App\Models\Technology;
 use App\Models\User;
+use App\Services\Internal\AssessmentClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -115,6 +118,70 @@ class TechnologyAndCandidateApiTest extends TestCase
             ->json('id');
 
         Queue::assertPushed(CalculateAssessmentJob::class, fn (CalculateAssessmentJob $job) => $job->assessmentId === $assessmentId);
+    }
+
+    public function test_assessment_payload_resolves_requirement_synonym_to_canonical_technology_name(): void
+    {
+        Http::fake([
+            'assessment-service:8000/*' => Http::response([
+                'status' => 'done',
+                'must_score' => 100,
+                'nice_score' => 0,
+                'total_score' => 100,
+                'has_missing_must_requirements' => false,
+                'requirement_results' => [],
+            ]),
+        ]);
+
+        $admin = User::query()->firstOrCreate(
+            ['login' => 'admin'],
+            [
+                'id' => '11111111-1111-4111-8111-111111111111',
+                'password_hash' => Hash::make('password'),
+                'role' => 'admin',
+            ],
+        );
+        $technology = Technology::create(['name' => 'PostgreSQL', 'group_name' => 'databases']);
+        $technology->synonyms()->create([
+            'synonym' => 'Postgres',
+            'normalized_synonym' => 'postgres',
+        ]);
+        $request = CustomerRequest::create([
+            'title' => 'Backend search',
+            'position' => 'Backend developer',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+        $request->requirements()->create([
+            'raw_text' => 'Postgres',
+            'type' => 'must',
+            'weight' => 3,
+        ]);
+        $candidate = Candidate::create([
+            'display_name' => 'PostgreSQL Candidate',
+            'file_storage_key' => 'resumes/postgresql.pdf',
+            'original_file_name' => 'postgresql.pdf',
+            'file_mime_type' => 'application/pdf',
+            'file_size' => 100,
+            'parsing_status' => 'parsed',
+            'recognition_status' => 'done',
+            'created_by' => $admin->id,
+        ]);
+        $candidate->skills()->create([
+            'technology_id' => $technology->id,
+            'raw_text' => 'PostgreSQL',
+            'normalized_name' => 'postgresql',
+        ]);
+        $assessment = Assessment::create([
+            'request_id' => $request->id,
+            'candidate_id' => $candidate->id,
+            'status' => 'queued',
+            'run_number' => 1,
+        ]);
+
+        app(AssessmentClient::class)->calculate($assessment);
+
+        Http::assertSent(fn ($httpRequest) => $httpRequest['requirements'][0]['normalized_name'] === 'postgresql');
     }
 
     private function adminToken(): string
