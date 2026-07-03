@@ -27,7 +27,6 @@ const routeAccess = {
   comparison: ["leader"],
   dictionary: ["admin"],
   users: ["admin"],
-  rules: ["admin"],
 };
 
 const actionAccess = {
