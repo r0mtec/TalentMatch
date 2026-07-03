@@ -109,9 +109,40 @@ class RuleBasedSkillRecognizer
             return $this->compactEvidence(mb_substr($text, 0, 220));
         }
 
-        $start = max(0, $position - 90);
+        $start = $this->sentenceStart($text, $position);
+        $end = $this->sentenceEnd($text, $position + mb_strlen($term));
 
-        return $this->compactEvidence(mb_substr($text, $start, 220));
+        return $this->compactEvidence(mb_substr($text, $start, $end - $start));
+    }
+
+    private function sentenceStart(string $text, int $position): int
+    {
+        $start = 0;
+
+        foreach (['.', ';'] as $delimiter) {
+            $delimiterPosition = mb_strrpos(mb_substr($text, 0, $position), $delimiter);
+
+            if ($delimiterPosition !== false) {
+                $start = max($start, $delimiterPosition + 1);
+            }
+        }
+
+        return $start;
+    }
+
+    private function sentenceEnd(string $text, int $position): int
+    {
+        $end = mb_strlen($text);
+
+        foreach (['.', ';'] as $delimiter) {
+            $delimiterPosition = mb_strpos($text, $delimiter, $position);
+
+            if ($delimiterPosition !== false) {
+                $end = min($end, $delimiterPosition + 1);
+            }
+        }
+
+        return $end;
     }
 
     private function compactEvidence(string $evidence): string

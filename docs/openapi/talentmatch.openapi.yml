@@ -226,6 +226,7 @@ paths:
             schema:
               $ref: "#/components/schemas/RequirementInput"
       responses:
+        "200": { description: Existing duplicate requirement returned without creating a new row }
         "201": { description: Created }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -883,7 +884,7 @@ components:
           items: { type: string }
     InternalSkillRecognizeRequest:
       type: object
-      required: [candidate_id, plain_text, technologies]
+      required: [candidate_id, plain_text]
       properties:
         candidate_id: { type: string, format: uuid }
         plain_text: { type: string }

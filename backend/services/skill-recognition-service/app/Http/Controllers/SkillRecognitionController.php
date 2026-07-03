@@ -17,7 +17,7 @@ class SkillRecognitionController extends Controller
         $validator = Validator::make($request->all(), [
             'candidate_id' => ['required', 'uuid'],
             'plain_text' => ['required', 'string'],
-            'technologies' => ['required', 'array'],
+            'technologies' => ['nullable', 'array'],
             'technologies.*.id' => ['required_with:technologies', 'uuid'],
             'technologies.*.name' => ['required_with:technologies', 'string'],
             'technologies.*.group_name' => ['nullable', 'string'],

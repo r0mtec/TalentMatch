@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\Assessment;
+use App\Models\Candidate;
+use App\Models\CustomerRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -81,6 +84,102 @@ class AuthAndRequestApiTest extends TestCase
         $this->withToken($this->adminToken())->postJson('/api/requests', [
             'status' => 'paused',
         ])->assertStatus(422);
+    }
+
+    public function test_duplicate_requirement_post_is_idempotent(): void
+    {
+        $token = $this->adminToken();
+        $admin = User::query()->where('login', 'admin')->firstOrFail();
+        $request = CustomerRequest::create([
+            'title' => 'Backend search',
+            'position' => 'Backend developer',
+            'status' => 'draft',
+            'created_by' => $admin->id,
+        ]);
+
+        $payload = [
+            'raw_text' => ' PHP ',
+            'type' => 'must',
+            'weight' => 3,
+        ];
+
+        $requirementId = $this->withToken($token)
+            ->postJson('/api/requests/'.$request->id.'/requirements', $payload)
+            ->assertCreated()
+            ->json('id');
+
+        $this->withToken($token)
+            ->postJson('/api/requests/'.$request->id.'/requirements', [
+                'raw_text' => 'php',
+                'type' => 'must',
+                'weight' => 5,
+            ])
+            ->assertOk()
+            ->assertJsonPath('id', $requirementId);
+
+        $this->assertSame(1, $request->requirements()->count());
+    }
+
+    public function test_requirement_update_cannot_create_duplicate(): void
+    {
+        $token = $this->adminToken();
+        $admin = User::query()->where('login', 'admin')->firstOrFail();
+        $request = CustomerRequest::create([
+            'title' => 'Backend search',
+            'position' => 'Backend developer',
+            'status' => 'draft',
+            'created_by' => $admin->id,
+        ]);
+        $request->requirements()->create([
+            'raw_text' => 'php',
+            'type' => 'must',
+            'weight' => 3,
+        ]);
+        $dockerRequirement = $request->requirements()->create([
+            'raw_text' => 'docker',
+            'type' => 'must',
+            'weight' => 3,
+        ]);
+
+        $this->withToken($token)
+            ->patchJson('/api/requirements/'.$dockerRequirement->id, [
+                'raw_text' => ' PHP ',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Такое требование уже добавлено в запрос.');
+    }
+
+    public function test_assessment_report_is_not_available_before_calculation_finishes(): void
+    {
+        $token = $this->adminToken();
+        $admin = User::query()->where('login', 'admin')->firstOrFail();
+        $request = CustomerRequest::create([
+            'title' => 'Backend search',
+            'position' => 'Backend developer',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+        $candidate = Candidate::create([
+            'display_name' => 'Processing Candidate',
+            'file_storage_key' => 'resumes/processing.pdf',
+            'original_file_name' => 'processing.pdf',
+            'file_mime_type' => 'application/pdf',
+            'file_size' => 100,
+            'parsing_status' => 'parsed',
+            'recognition_status' => 'processing',
+            'created_by' => $admin->id,
+        ]);
+        $assessment = Assessment::create([
+            'request_id' => $request->id,
+            'candidate_id' => $candidate->id,
+            'run_number' => 1,
+            'status' => 'processing',
+        ]);
+
+        $this->withToken($token)
+            ->getJson('/api/assessments/'.$assessment->id.'/report.pdf')
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Отчет доступен только после завершения оценки.');
     }
 
     private function adminToken(): string
