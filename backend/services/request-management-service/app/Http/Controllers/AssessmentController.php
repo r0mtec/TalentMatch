@@ -126,6 +126,13 @@ class AssessmentController extends Controller
 
     public function report(Assessment $assessment)
     {
+        if ($assessment->status !== 'done' || $assessment->calculated_at === null) {
+            return response()->json([
+                'message' => 'Отчет доступен только после завершения оценки.',
+                'status' => $assessment->status,
+            ], 409);
+        }
+
         $this->auditLog->log('assessment.report_exported', 'assessment', $assessment->id, [], $this->currentUserId());
 
         return response($this->reportClient->assessmentPdf($assessment), 200)->header('Content-Type', 'application/pdf');

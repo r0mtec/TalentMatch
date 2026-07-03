@@ -7,10 +7,11 @@ ARG INSTALL_PARSERS=false
 ARG INSTALL_PDF=false
 ARG INSTALL_DEV=true
 ARG SERVICE_APP_NAME=Laravel
+ARG COMPOSER_DISABLE_NETWORK=0
 
 WORKDIR /app
 
-RUN composer create-project laravel/laravel . "^12.0" --no-interaction --no-install --no-scripts --no-progress \
+RUN COMPOSER_DISABLE_NETWORK=0 composer create-project laravel/laravel . "^12.0" --no-interaction --no-install --no-scripts --no-progress \
     && composer config platform.php 8.3.31 \
     && if [ "$INSTALL_DEV" = "true" ]; then composer install --no-interaction --no-scripts --no-progress; else composer install --no-interaction --no-dev --no-scripts --no-progress; fi
 RUN rm -f database/migrations/*.php tests/Feature/ExampleTest.php tests/Unit/ExampleTest.php

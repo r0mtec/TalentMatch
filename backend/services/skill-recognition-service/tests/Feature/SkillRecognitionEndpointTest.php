@@ -35,4 +35,15 @@ class SkillRecognitionEndpointTest extends TestCase
         ])->assertStatus(422)
             ->assertJsonPath('status', 'failed');
     }
+
+    public function test_internal_recognition_endpoint_accepts_empty_dictionary(): void
+    {
+        $this->postJson('/api/internal/skills/recognize', [
+            'candidate_id' => '11111111-1111-4111-8111-111111111111',
+            'plain_text' => 'Skills: PostgreSQL, Docker.',
+            'technologies' => [],
+        ])->assertOk()
+            ->assertJsonPath('status', 'done')
+            ->assertJsonPath('skills', []);
+    }
 }

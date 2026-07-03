@@ -12,6 +12,7 @@ use App\Services\AuditLogService;
 use App\Support\RussianValidation;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Str;
 
 class RequestController extends Controller
 {
@@ -93,6 +94,10 @@ class RequestController extends Controller
         $data = $httpRequest->validated();
         $data['weight'] ??= $data['type'] === 'must' ? 3 : 1;
 
+        if ($duplicate = $this->findDuplicateRequirement($request, $data)) {
+            return response()->json($duplicate->load('technology'));
+        }
+
         $requirement = $request->requirements()->create($data);
 
         $this->auditLog->log('requirement.created', 'requirement', $requirement->id, ['request_id' => $request->id], $this->currentUserId());
@@ -113,6 +118,10 @@ class RequestController extends Controller
             return response()->json(['message' => 'Текст требования обязателен, если технология не указана.'], 422);
         }
 
+        if ($error = $this->duplicateRequirementError($requirement->customerRequest, array_merge($requirement->only(['technology_id', 'raw_text', 'type']), $data), $requirement->id)) {
+            return $error;
+        }
+
         $requirement->update($data);
 
         $this->auditLog->log('requirement.updated', 'requirement', $requirement->id, [], $this->currentUserId());
@@ -128,6 +137,48 @@ class RequestController extends Controller
         $this->auditLog->log('requirement.deleted', 'requirement', $id, [], $this->currentUserId());
 
         return response()->json(['id' => $id, 'deleted' => true]);
+    }
+
+    private function duplicateRequirementError(CustomerRequest $request, array $data, ?string $ignoreRequirementId = null): ?JsonResponse
+    {
+        if ($this->findDuplicateRequirement($request, $data, $ignoreRequirementId) === null) {
+            return null;
+        }
+
+        return response()->json([
+            'message' => 'Такое требование уже добавлено в запрос.',
+            'errors' => [
+                'requirement' => ['Такое требование уже добавлено в запрос.'],
+            ],
+        ], 422);
+    }
+
+    private function findDuplicateRequirement(CustomerRequest $request, array $data, ?string $ignoreRequirementId = null): ?Requirement
+    {
+        $technologyId = $data['technology_id'] ?? null;
+        $rawText = $this->normalizeRequirementText($data['raw_text'] ?? null);
+        $type = $data['type'];
+
+        return $request->requirements()
+            ->when($ignoreRequirementId !== null, fn ($query) => $query->whereKeyNot($ignoreRequirementId))
+            ->get()
+            ->first(function (Requirement $requirement) use ($technologyId, $rawText, $type): bool {
+                return $requirement->type === $type
+                    && $requirement->technology_id === $technologyId
+                    && $this->normalizeRequirementText($requirement->raw_text) === $rawText;
+            });
+    }
+
+    private function normalizeRequirementText(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = preg_replace('/\s+/u', ' ', (string) $value) ?? (string) $value;
+        $value = Str::lower(trim($value));
+
+        return $value === '' ? null : $value;
     }
 
     private function activeValidationError(CustomerRequest $request, array $changes = []): ?JsonResponse

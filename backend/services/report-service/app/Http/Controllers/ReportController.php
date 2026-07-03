@@ -22,7 +22,7 @@ class ReportController extends Controller
         }
 
         return $this->pdfResponse(
-            $this->renderAssessmentHtml($validator->validated()['assessment']),
+            $this->renderAssessmentHtml($request->input('assessment')),
             'assessment-report.pdf',
         );
     }
@@ -39,10 +39,8 @@ class ReportController extends Controller
             return response()->json(['status' => 'failed', 'error' => $validator->errors()->first()], 422);
         }
 
-        $data = $validator->validated();
-
         return $this->pdfResponse(
-            $this->renderComparisonHtml($data['request'], $data['assessments']),
+            $this->renderComparisonHtml($request->input('request'), $request->input('assessments')),
             'comparison-report.pdf',
         );
     }

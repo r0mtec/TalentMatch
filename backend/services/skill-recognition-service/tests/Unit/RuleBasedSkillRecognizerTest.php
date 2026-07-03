@@ -53,6 +53,25 @@ class RuleBasedSkillRecognizerTest extends TestCase
         self::assertSame(['tech-js'], array_column($result['skills'], 'technology_id'));
     }
 
+    public function test_evidence_returns_sentence_containing_matched_term(): void
+    {
+        $result = $this->recognizer()->recognize(
+            'Опыт коммерческой разработки. Использовал PHP, Laravel и PostgreSQL в backend-сервисах; Docker был в инфраструктуре.',
+            [
+                [
+                    'id' => 'tech-postgres',
+                    'name' => 'PostgreSQL',
+                    'synonyms' => ['psql'],
+                ],
+            ],
+        );
+
+        self::assertSame(
+            'Использовал PHP, Laravel и PostgreSQL в backend-сервисах;',
+            $result['skills'][0]['evidence_text'],
+        );
+    }
+
     public function test_it_returns_unrecognized_terms_from_skills_section(): void
     {
         $result = $this->recognizer()->recognize("Skills:\nLaravel, Kafka, ClickHouse\nExperience:\nBackend work");
