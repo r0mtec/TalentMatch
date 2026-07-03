@@ -1,4 +1,5 @@
 import { apiRequest } from "./apiClient.js";
+import { decodeMimeEncodedWord } from "../utils/formatters.js";
 
 const groupToBackend = {
   languages: "languages",
@@ -70,6 +71,49 @@ export async function addTechnologySynonym(id, synonym) {
   });
 }
 
+export async function updateTechnologySynonym(id, synonym) {
+  return apiRequest(`/technology-synonyms/${id}`, {
+    method: "PATCH",
+    body: { synonym },
+  });
+}
+
 export async function deleteTechnologySynonym(id) {
   return apiRequest(`/technology-synonyms/${id}`, { method: "DELETE" });
+}
+
+const normalizeUnrecognizedTerm = (item) => ({
+  id: item.id,
+  term: item.term || "",
+  context: item.context || "",
+  status: item.status || "new",
+  candidateId: item.candidate_id || item.candidateId || item.candidate?.id,
+  candidateName: decodeMimeEncodedWord(item.candidate?.display_name || item.candidate?.original_file_name || ""),
+  createdAt: item.created_at || item.createdAt || "",
+  source: item.source || item.source_section || item.section || "",
+});
+
+export async function getUnrecognizedTerms(params = {}) {
+  const payload = await apiRequest("/unrecognized-terms", { query: params });
+  const data = Array.isArray(payload) ? payload : payload?.data || [];
+  return {
+    items: data.map(normalizeUnrecognizedTerm),
+    meta: {
+      currentPage: payload?.current_page || 1,
+      perPage: payload?.per_page || data.length || 50,
+      total: payload?.total || data.length,
+    },
+  };
+}
+
+export async function promoteUnrecognizedTerm(id, payload) {
+  const technology = await apiRequest(`/unrecognized-terms/${id}/promote`, {
+    method: "POST",
+    body: {
+      name: payload.name,
+      group_name: groupToBackend[payload.group] || payload.group || "other",
+      synonyms: payload.synonyms || [],
+    },
+  });
+  return normalizeTechnology(technology?.data || technology);
 }

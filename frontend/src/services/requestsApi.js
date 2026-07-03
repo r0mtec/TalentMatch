@@ -11,7 +11,16 @@ import {
 const typedRequirements = (form) => [
   ...(form.mustHave || []).map((item) => ({ item, type: "must" })),
   ...(form.niceToHave || []).map((item) => ({ item, type: "nice" })),
-];
+].reduce((acc, requirement) => {
+  const rawText = String(requirement.item.raw_text || requirement.item.title || requirement.item.name || "").trim();
+  const technologyId = requirement.item.technology_id || requirement.item.technologyId || "";
+  const key = `${requirement.type}:${technologyId}:${rawText.toLowerCase()}`;
+  if (!rawText && !isValidUuid(technologyId)) return acc;
+  if (acc.keys.has(key)) return acc;
+  acc.keys.add(key);
+  acc.items.push({ ...requirement, item: { ...requirement.item, raw_text: rawText, title: rawText || requirement.item.title } });
+  return acc;
+}, { keys: new Set(), items: [] }).items;
 
 const createRequirements = async (requestId, form) => {
   const requirements = mapRequirementsToBackend(form.mustHave, form.niceToHave);
@@ -37,7 +46,6 @@ const syncRequirements = async (requestId, form) => {
     });
     saved.push(result);
   }
-  // TODO: удалить requirements, убранные из формы, когда backend/OpenAPI предоставит batch replace или когда UI начнёт хранить original ids для diff.
   return saved;
 };
 
@@ -52,7 +60,8 @@ export async function getRequestById(id) {
 }
 
 export async function createRequest(form, status = form.status || "draft") {
-  const requestPayload = mapFrontendRequestToBackend(form, status);
+  const targetStatus = status;
+  const requestPayload = mapFrontendRequestToBackend(form, targetStatus === "active" ? "draft" : targetStatus);
   const created = await apiRequest("/requests", { method: "POST", body: requestPayload });
   const request = mapBackendRequestToFrontend(created?.data || created);
   if (request.id) {
@@ -65,14 +74,21 @@ export async function createRequest(form, status = form.status || "draft") {
         payload: error.payload,
       });
     }
+    if (targetStatus === "active") {
+      await apiRequest(`/requests/${request.id}`, {
+        method: "PATCH",
+        body: mapFrontendRequestToBackend(form, "active"),
+      });
+    }
   }
   return request.id ? getRequestById(request.id).catch(() => request) : request;
 }
 
 export async function updateRequest(id, form, status = form.status || "draft") {
+  const shouldDelayActivation = status === "active" && form.status !== "active";
   const updated = await apiRequest(`/requests/${id}`, {
     method: "PATCH",
-    body: mapFrontendRequestToBackend(form, status),
+    body: mapFrontendRequestToBackend(form, shouldDelayActivation ? "draft" : status),
   });
   await syncRequirements(id, form).catch((error) => {
     throw new ApiError("Запрос обновлён, но требования не синхронизированы. Проверьте текст требований и веса.", {
@@ -81,6 +97,13 @@ export async function updateRequest(id, form, status = form.status || "draft") {
       payload: error.payload,
     });
   });
+  if (shouldDelayActivation) {
+    const activated = await apiRequest(`/requests/${id}`, {
+      method: "PATCH",
+      body: mapFrontendRequestToBackend(form, "active"),
+    });
+    return mapBackendRequestToFrontend(activated?.data || activated);
+  }
   return mapBackendRequestToFrontend(updated?.data || updated);
 }
 

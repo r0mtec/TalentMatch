@@ -9,6 +9,7 @@ import { Pagination, usePagination } from "../../components/ui/Pagination.jsx";
 import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
 import { gradeOptions } from "../../data/mockData.js";
 import { getRequests } from "../../services/requestsApi.js";
+import { canDo, getStoredUser } from "../../utils/access.js";
 import { formatDate, gradeBadge, shortId, statusBadge, statusLabels } from "../../utils/formatters.js";
 
 const statusFilterOptions = ["Активен", "Черновик", "Закрыт"];
@@ -23,6 +24,7 @@ export function RequestsPage() {
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const canCreateRequest = canDo("createRequest", getStoredUser()?.role);
 
   useEffect(() => {
     let ignore = false;
@@ -52,7 +54,6 @@ export function RequestsPage() {
 
   const filtered = useMemo(() => requests.filter((request) => {
     const statusValues = statuses.map((status) => statusByLabel[status]);
-    // TODO: убрать frontend-фильтрацию, если backend добавит поддержку множественных grade/status query params.
     return (!grades.length || grades.includes(request.grade))
       && (!statusValues.length || statusValues.includes(request.status))
       && (!dateFrom || request.createdAt >= dateFrom)
@@ -64,7 +65,7 @@ export function RequestsPage() {
     <>
       <div className="page-head">
         <div><h1>Запросы</h1><p>Создание и управление требованиями заказчика</p></div>
-        <Button icon="bi-plus-lg" onClick={() => navigate("/requests/new")}>Создать запрос</Button>
+        {canCreateRequest ? <Button icon="bi-plus-lg" onClick={() => navigate("/requests/new")}>Создать запрос</Button> : null}
       </div>
       <Card>
         <div className="filters request-filters">

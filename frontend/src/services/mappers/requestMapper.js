@@ -15,17 +15,34 @@ const normalizeRequirement = (requirement, type, requestId) => ({
   weight: Number(requirement.weight || 1),
 });
 
+const requirementKey = (requirement, fallbackType) => {
+  const type = requirement.type || fallbackType;
+  const text = String(requirement.raw_text || requirement.title || requirement.name || "").trim().toLowerCase();
+  return `${type}:${requirement.technology_id || requirement.technologyId || ""}:${text || requirement.id || ""}`;
+};
+
+const uniqueRequirements = (items, fallbackType, requestId) => {
+  const seen = new Set();
+  return items.reduce((acc, item) => {
+    const key = requirementKey(item, fallbackType);
+    if (seen.has(key)) return acc;
+    seen.add(key);
+    acc.push(normalizeRequirement(item, fallbackType, requestId));
+    return acc;
+  }, []);
+};
+
 export function mapBackendRequestToFrontend(payload) {
   const request = payload?.data || payload;
   const requirements = request?.requirements || [];
-  const mustHave = [
+  const mustHave = uniqueRequirements([
     ...(request?.must_have || []),
     ...requirements.filter((item) => item.type === "must"),
-  ].map((item) => normalizeRequirement(item, "must", request?.id));
-  const niceToHave = [
+  ], "must", request?.id);
+  const niceToHave = uniqueRequirements([
     ...(request?.nice_to_have || []),
     ...requirements.filter((item) => item.type === "nice"),
-  ].map((item) => normalizeRequirement(item, "nice", request?.id));
+  ], "nice", request?.id);
 
   return {
     id: request?.id,
@@ -60,7 +77,6 @@ export function mapFrontendRequestToBackend(form, status) {
     workload: form.workload || null,
     start_date: form.startDate || form.employment_date || null,
     status: statusToBackend[status || form.status] || status || form.status || "draft",
-    // TODO: отправлять engagement_period после добавления поля в OpenAPI CustomerRequestInput.
   };
 }
 
@@ -76,10 +92,19 @@ export function mapRequirementToBackend(requirement, type) {
 }
 
 export function mapRequirementsToBackend(mustHave = [], niceToHave = []) {
+  const seen = new Set();
   return [
-    ...mustHave.map((requirement) => mapRequirementToBackend(requirement, "must")),
-    ...niceToHave.map((requirement) => mapRequirementToBackend(requirement, "nice")),
-  ];
+    ...mustHave.map((requirement) => ({ requirement, type: "must" })),
+    ...niceToHave.map((requirement) => ({ requirement, type: "nice" })),
+  ].reduce((acc, { requirement, type }) => {
+    const rawText = String(requirement.raw_text || requirement.title || requirement.name || "").trim();
+    const key = `${type}:${requirement.technology_id || requirement.technologyId || ""}:${rawText.toLowerCase()}`;
+    if (!rawText && !isValidUuid(requirement.technology_id || requirement.technologyId)) return acc;
+    if (seen.has(key)) return acc;
+    seen.add(key);
+    acc.push(mapRequirementToBackend({ ...requirement, raw_text: rawText, title: rawText || requirement.title }, type));
+    return acc;
+  }, []);
 }
 
 export const mapFrontendRequirementToBackend = mapRequirementToBackend;

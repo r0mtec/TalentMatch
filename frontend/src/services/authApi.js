@@ -1,6 +1,5 @@
 import { apiRequest } from "./apiClient.js";
-
-const normalizeRole = (role) => (role === "lead" ? "leader" : role || "account_manager");
+import { normalizeRole } from "../utils/access.js";
 
 export async function login(credentials) {
   const payload = await apiRequest("/auth/login", {
