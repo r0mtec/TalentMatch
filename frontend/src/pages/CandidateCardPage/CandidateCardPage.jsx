@@ -7,14 +7,15 @@ import { Field, Input, Select } from "../../components/ui/Form.jsx";
 import { Modal } from "../../components/ui/Modal.jsx";
 import { EmptyState } from "../../components/ui/Table.jsx";
 import { useToast } from "../../components/ui/Toast.jsx";
-import { gradeOptions } from "../../data/mockData.js";
+import { gradeOptions } from "../../data/uiConstants.js";
 import { getAssessmentById, getAssessmentsByRequest, runAssessmentForRequestCandidate } from "../../services/assessmentsApi.js";
 import { createCandidateSkill, deleteCandidateSkill, getCandidateById, updateCandidate } from "../../services/candidatesApi.js";
 import { downloadAssessmentReport } from "../../services/reportsApi.js";
 import { getRequests } from "../../services/requestsApi.js";
 import { getUnrecognizedTerms } from "../../services/technologiesApi.js";
 import { canDo, getStoredUser } from "../../utils/access.js";
-import { isUsableCandidateName } from "../../utils/candidateName.js";
+import { getCandidateDisplayName } from "../../utils/candidateName.js";
+import { getCandidateSkills } from "../../utils/candidateSkills.js";
 import {
   formatAssessmentStatus,
   formatDate,
@@ -37,13 +38,7 @@ const latestAssessment = (items) => [...items].sort((a, b) => {
 
 const processingStatuses = new Set(["uploaded", "pending", "processing", "queued"]);
 
-const candidateHeading = (candidate) => {
-  const fileName = candidate.original_file_name || candidate.fileName || "";
-  const name = String(candidate.fio || candidate.displayName || "").trim();
-  if (isUsableCandidateName(name, fileName)) return name;
-  if (fileName) return `Резюме: ${fileName}`;
-  return "Кандидат без имени";
-};
+const candidateHeading = (candidate) => getCandidateDisplayName(candidate);
 
 const skillHint = (skill) =>
   [
@@ -71,6 +66,9 @@ export function CandidateCardPage() {
   const [candidateTerms, setCandidateTerms] = useState([]);
   const [metaEditing, setMetaEditing] = useState(false);
   const [metaForm, setMetaForm] = useState({ grade: "Middle", location: "", citizenship: "" });
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameForm, setNameForm] = useState("");
+  const [nameError, setNameError] = useState("");
   const currentUser = getStoredUser();
   const canEditCandidate = canDo("editCandidate", currentUser?.role);
   const canEditSkills = canDo("editCandidateSkills", currentUser?.role);
@@ -100,6 +98,7 @@ export function CandidateCardPage() {
             location: candidateData.location || "",
             citizenship: candidateData.citizenship || "",
           });
+          setNameForm(candidateHeading(candidateData));
           setRequests(requestItems);
           setAssessment(detailed);
           setCandidateTerms((termResult.items || []).filter((term) => term.candidateId === candidateId));
@@ -117,7 +116,7 @@ export function CandidateCardPage() {
   }, [candidateId, reloadKey]);
 
   const request = assessment?.request || requests.find((item) => item.id === assessment?.request_id);
-  const recognizedSkills = candidate?.recognizedSkills || candidate?.skills || [];
+  const recognizedSkills = getCandidateSkills(candidate);
   const reassessTargets = requests.filter((item) => item.id !== assessment?.request_id);
   const hasMissingMust = Boolean(assessment?.hasMissingMustRequirements || assessment?.missingMustRequirements?.length);
   const assessmentReady = isAssessmentCalculated(assessment);
@@ -221,6 +220,40 @@ export function CandidateCardPage() {
     }
   };
 
+  const openNameEditor = () => {
+    setNameForm(candidateHeading(candidate));
+    setNameError("");
+    setNameEditing(true);
+  };
+
+  const saveName = async () => {
+    if (!canEditCandidate) return;
+    const displayName = nameForm.trim();
+    if (!displayName) {
+      setNameError("Введите ФИО или отображаемое имя.");
+      return;
+    }
+
+    setActionLoading("candidate-name");
+    setApiError("");
+    setNameError("");
+    try {
+      const updated = await updateCandidate(candidate.id, { display_name: displayName }, candidate);
+      setCandidate(updated);
+      setNameForm(candidateHeading(updated));
+      setNameEditing(false);
+      notify("Имя кандидата обновлено");
+    } catch (caught) {
+      console.debug("Candidate name update failed", caught);
+      const message = caught.status === 404
+        ? "Редактирование имени кандидата пока не поддерживается backend."
+        : caught.errors?.display_name || caught.message || "Не удалось сохранить имя кандидата.";
+      setNameError(message);
+    } finally {
+      setActionLoading("");
+    }
+  };
+
   const saveMeta = async () => {
     if (!canEditCandidate) return;
     setActionLoading("candidate-meta");
@@ -230,7 +263,7 @@ export function CandidateCardPage() {
         grade: metaForm.grade,
         location: metaForm.location.trim(),
         citizenship: metaForm.citizenship.trim(),
-      });
+      }, candidate);
       setCandidate(updated);
       setMetaEditing(false);
       await recalculateCurrentAssessment("Данные кандидата обновлены, покрытие пересчитано");
@@ -289,7 +322,14 @@ export function CandidateCardPage() {
     <>
       <div className="page-head">
         <div>
-          <h1>{candidateHeading(candidate)}</h1>
+          <div className="candidate-title-row">
+            <h1>{candidateHeading(candidate)}</h1>
+            {canEditCandidate ? (
+              <Button variant="secondary" className="btn-small" icon="bi-pencil" onClick={openNameEditor}>
+                Редактировать
+              </Button>
+            ) : null}
+          </div>
           <p>Загружен {formatDate(candidate.uploadedAt)} · {candidate.original_file_name || candidate.fileName || "файл без названия"}</p>
         </div>
         <div className="table-actions">
@@ -508,6 +548,29 @@ export function CandidateCardPage() {
             <SkeletonList title="Детализация появится после расчёта" />
           </Card>
         </div>
+      ) : null}
+      {nameEditing ? (
+        <Modal title="Редактирование имени кандидата" onClose={() => setNameEditing(false)}>
+          <Field label="ФИО / отображаемое имя" error={nameError}>
+            <Input
+              value={nameForm}
+              onChange={(event) => {
+                setNameForm(event.target.value);
+                if (nameError) setNameError("");
+              }}
+              placeholder="Например: Фамилия Имя Отчество"
+              autoFocus
+            />
+          </Field>
+          <div className="actions-bar">
+            <Button icon="bi-check2" disabled={actionLoading === "candidate-name"} onClick={saveName}>
+              {actionLoading === "candidate-name" ? "Сохраняем..." : "Сохранить"}
+            </Button>
+            <Button variant="ghost" disabled={actionLoading === "candidate-name"} onClick={() => setNameEditing(false)}>
+              Отмена
+            </Button>
+          </div>
+        </Modal>
       ) : null}
       {reassessOpen ? (
         <Modal title="Прогнать под другой запрос" onClose={() => setReassessOpen(false)}>

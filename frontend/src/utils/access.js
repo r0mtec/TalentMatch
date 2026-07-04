@@ -7,7 +7,7 @@ export const roleLabels = {
 export const normalizeRole = (role) => {
   if (role === "lead") return "leader";
   if (role === "administrator") return "admin";
-  return role || "account_manager";
+  return role || "";
 };
 
 export const getStoredUser = () => {
@@ -24,7 +24,7 @@ const routeAccess = {
   requests: ["account_manager", "leader"],
   requestEdit: ["account_manager"],
   candidates: ["account_manager", "leader"],
-  comparison: ["leader"],
+  comparison: ["account_manager", "leader"],
   dictionary: ["admin"],
   users: ["admin"],
 };

@@ -15,7 +15,7 @@ export function AppLayout({ children }) {
   const storedUser = getStoredUser();
   const displayUser = {
     fullName: storedUser?.name || storedUser?.login || "Пользователь",
-    role: storedUser?.role || "account_manager",
+    role: storedUser?.role || "",
   };
 
   const logout = () => {

@@ -15,19 +15,19 @@ const normalizeRequirement = (requirement, type, requestId) => ({
   weight: Number(requirement.weight || 1),
 });
 
-const requirementKey = (requirement, fallbackType) => {
-  const type = requirement.type || fallbackType;
+const requirementKey = (requirement, defaultType) => {
+  const type = requirement.type || defaultType;
   const text = String(requirement.raw_text || requirement.title || requirement.name || "").trim().toLowerCase();
   return `${type}:${requirement.technology_id || requirement.technologyId || ""}:${text || requirement.id || ""}`;
 };
 
-const uniqueRequirements = (items, fallbackType, requestId) => {
+const uniqueRequirements = (items, defaultType, requestId) => {
   const seen = new Set();
   return items.reduce((acc, item) => {
-    const key = requirementKey(item, fallbackType);
+    const key = requirementKey(item, defaultType);
     if (seen.has(key)) return acc;
     seen.add(key);
-    acc.push(normalizeRequirement(item, fallbackType, requestId));
+    acc.push(normalizeRequirement(item, defaultType, requestId));
     return acc;
   }, []);
 };

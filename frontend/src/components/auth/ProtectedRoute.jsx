@@ -7,7 +7,7 @@ export function ProtectedRoute({ scope, children }) {
   const token = window.localStorage.getItem("talentmatch_token");
   const user = getStoredUser();
 
-  if (!user && !token) {
+  if (!user || !token) {
     return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   }
 

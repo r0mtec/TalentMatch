@@ -46,7 +46,6 @@ export function LoginPage() {
           <Field label="Пароль">
             <Input value={password} onChange={(event) => setPassword(event.target.value)} type="password" placeholder="Введите пароль" />
           </Field>
-          <a className="muted-link" href="#forgot">Забыли пароль?</a>
           <Button className="full" icon="bi-box-arrow-in-right" type="submit" disabled={loading}>{loading ? "Входим..." : "Войти в систему"}</Button>
         </form>
       </Card>
