@@ -9,7 +9,6 @@ import { DictionaryPage } from "../pages/DictionaryPage/DictionaryPage.jsx";
 import { LoginPage } from "../pages/LoginPage/LoginPage.jsx";
 import { RequestFormPage } from "../pages/RequestFormPage/RequestFormPage.jsx";
 import { RequestsPage } from "../pages/RequestsPage/RequestsPage.jsx";
-import { RulesPage } from "../pages/RulesPage/RulesPage.jsx";
 import { UsersPage } from "../pages/UsersPage/UsersPage.jsx";
 
 export const router = createBrowserRouter([
@@ -28,7 +27,6 @@ export const router = createBrowserRouter([
       { path: "comparison", element: <ProtectedRoute scope="comparison"><ComparisonPage /></ProtectedRoute> },
       { path: "dictionary", element: <ProtectedRoute scope="dictionary"><DictionaryPage /></ProtectedRoute> },
       { path: "users", element: <ProtectedRoute scope="users"><UsersPage /></ProtectedRoute> },
-      { path: "rules", element: <ProtectedRoute scope="rules"><RulesPage /></ProtectedRoute> },
     ],
   },
   { path: "*", element: <Navigate to="/dashboard" replace /> },

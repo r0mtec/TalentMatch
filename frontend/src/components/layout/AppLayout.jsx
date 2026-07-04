@@ -8,7 +8,6 @@ const navItems = [
   ["Сравнение", "/comparison", "bi-bar-chart", "comparison"],
   ["Справочник", "/dictionary", "bi-book", "dictionary"],
   ["Пользователи", "/users", "bi-person-gear", "users"],
-  ["Правила оценки", "/rules", "bi-sliders", "rules"],
 ];
 
 export function AppLayout({ children }) {
