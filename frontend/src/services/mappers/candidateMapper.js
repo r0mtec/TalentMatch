@@ -1,20 +1,25 @@
-import { extractCandidateNameFromText, getCandidateNameFromFields, isUsableCandidateName } from "../../utils/candidateName.js";
+import { getCandidateDisplayName, isUsableCandidateName } from "../../utils/candidateName.js";
+import { getCandidateSkills, normalizeCandidateSkill } from "../../utils/candidateSkills.js";
+import { decodeMimeEncodedWord } from "../../utils/formatters.js";
 
 export function mapBackendCandidateToFrontend(payload) {
   const candidate = payload?.data || payload?.candidate || payload;
-  const skills = candidate?.skills || candidate?.candidate_skills || candidate?.recognizedSkills || [];
+  const skills = getCandidateSkills(candidate);
   const assessments = candidate?.assessments || [];
   const recognizedText = candidate?.recognized_text || candidate?.parsed_text || "";
   const fileName = candidate?.original_file_name || candidate?.fileName || candidate?.file_name || "";
-  const backendName = getCandidateNameFromFields(candidate);
-  const extractedName = extractCandidateNameFromText(recognizedText);
-  const displayName = isUsableCandidateName(backendName, fileName) ? backendName : extractedName;
+  const displayName = getCandidateDisplayName(candidate);
+  const rawDisplayName = decodeMimeEncodedWord(candidate?.display_name || candidate?.displayName || "");
+  const rawFio = decodeMimeEncodedWord(candidate?.fio || "");
+  const rawFullName = decodeMimeEncodedWord(candidate?.full_name || candidate?.fullName || "");
 
   return {
     id: candidate?.id,
+    display_name: rawDisplayName,
     displayName,
     fullName: displayName,
-    fio: displayName,
+    full_name: rawFullName,
+    fio: isUsableCandidateName(rawFio, fileName) ? rawFio : "",
     grade: candidate?.grade || "Middle",
     location: candidate?.location || "Не указана",
     citizenship: candidate?.citizenship || "",
@@ -32,25 +37,16 @@ export function mapBackendCandidateToFrontend(payload) {
     recognition_error: candidate?.recognition_error || candidate?.skill_recognition_error || "",
     recognized_text: recognizedText,
     recognizedSkills: skills.map(mapBackendCandidateSkillToFrontend),
+    recognized_skills: skills.map(mapBackendCandidateSkillToFrontend),
+    candidateSkills: skills.map(mapBackendCandidateSkillToFrontend),
+    candidate_skills: skills.map(mapBackendCandidateSkillToFrontend),
     skills: skills.map(mapBackendCandidateSkillToFrontend),
     assessments: assessments.map(mapBackendAssessmentToFrontend),
   };
 }
 
 export function mapBackendCandidateSkillToFrontend(skill) {
-  return {
-    id: skill.id,
-    technologyId: skill.technology_id || skill.technologyId,
-    technology_id: skill.technology_id || skill.technologyId,
-    title: skill.title || skill.raw_text || skill.normalized_name,
-    normalized_name: skill.normalized_name || String(skill.title || skill.raw_text || "").toLowerCase(),
-    raw_text: skill.raw_text || skill.title,
-    text_source: skill.text_source || skill.evidence_text || skill.sourceText,
-    sourceText: skill.sourceText || skill.text_source || skill.evidence_text,
-    confidence: skill.confidence,
-    source_section: skill.source_section,
-    is_manual: Boolean(skill.is_manual),
-  };
+  return normalizeCandidateSkill(skill);
 }
 
 export function getCandidateAssessments(candidate) {

@@ -5,7 +5,7 @@ import { Card } from "../../components/ui/Card.jsx";
 import { Field, Input, Select, Textarea } from "../../components/ui/Form.jsx";
 import { ConfirmModal } from "../../components/ui/Modal.jsx";
 import { useToast } from "../../components/ui/Toast.jsx";
-import { gradeOptions } from "../../data/mockData.js";
+import { gradeOptions } from "../../data/uiConstants.js";
 import { batchUploadCandidateResumes } from "../../services/candidatesApi.js";
 import { createRequest as createBackendRequest, getRequestById, updateRequest as updateBackendRequest } from "../../services/requestsApi.js";
 import { mapBackendValidationToFrontend } from "../../services/mappers/requestMapper.js";

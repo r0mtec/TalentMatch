@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
@@ -7,16 +7,17 @@ import { Input, Select } from "../../components/ui/Form.jsx";
 import { Pagination, usePagination } from "../../components/ui/Pagination.jsx";
 import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
 import { useToast } from "../../components/ui/Toast.jsx";
-import { gradeOptions } from "../../data/mockData.js";
+import { gradeOptions } from "../../data/uiConstants.js";
 import { compareCandidates, getAssessmentsByRequest, runAssessmentForRequestCandidate } from "../../services/assessmentsApi.js";
-import { getAllCandidates, getCandidateSkills } from "../../services/candidatesApi.js";
+import { getAllCandidates, hydrateCandidatesSkills } from "../../services/candidatesApi.js";
 import { downloadComparisonReport } from "../../services/reportsApi.js";
 import { getRequests } from "../../services/requestsApi.js";
 import { canDo, getStoredUser } from "../../utils/access.js";
+import { getCandidateDisplayName } from "../../utils/candidateName.js";
+import { getCandidateSkills, getCandidateSkillTitle } from "../../utils/candidateSkills.js";
 import { formatAssessmentStatus, gradeBadge, isAssessmentCalculated, isAssessmentFailed, requestOptionLabel } from "../../utils/formatters.js";
 
-const candidateTitle = (candidate) =>
-  candidate.fullName || candidate.fio || candidate.displayName || candidate.fileName || "Кандидат без имени";
+const candidateTitle = (candidate) => getCandidateDisplayName(candidate);
 
 const missingMustCount = (assessment) =>
   assessment?.missingMustRequirements?.length || (assessment?.hasMissingMustRequirements ? 1 : 0);
@@ -72,12 +73,7 @@ export function ComparisonPage() {
           getAllCandidates({ per_page: 100 }),
           getRequests({ per_page: 200 }),
         ]);
-        const candidatesWithSkills = await Promise.all(candidateItems.map(async (candidate) => {
-          const skills = candidate.id
-            ? await getCandidateSkills(candidate.id).catch(() => candidate.recognizedSkills || candidate.skills || [])
-            : [];
-          return { ...candidate, recognizedSkills: skills, skills };
-        }));
+        const candidatesWithSkills = await hydrateCandidatesSkills(candidateItems);
         const requestItems = requestResult.items || [];
         const defaultRequest = requestItems.find((request) => request.status === "active") || requestItems[0];
         if (!ignore) {
@@ -164,8 +160,8 @@ export function ComparisonPage() {
   const rows = useMemo(() => candidates
     .map((candidate) => ({ candidate, assessment: assessmentByCandidate.get(candidate.id) || null }))
     .filter(({ candidate }) => {
-      const skills = candidate.recognizedSkills || candidate.skills || [];
-      const text = `${candidateTitle(candidate)} ${skills.map((skill) => skill.title || skill.raw_text || "").join(" ")}`.toLowerCase();
+      const skills = getCandidateSkills(candidate);
+      const text = `${candidateTitle(candidate)} ${skills.map(getCandidateSkillTitle).join(" ")}`.toLowerCase();
       return (grade === "Все" || candidate.grade === grade)
         && (!query.trim() || text.includes(query.trim().toLowerCase()));
     })

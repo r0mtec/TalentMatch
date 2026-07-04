@@ -7,7 +7,7 @@ import { Dropdown } from "../../components/ui/Dropdown.jsx";
 import { Input } from "../../components/ui/Form.jsx";
 import { Pagination, usePagination } from "../../components/ui/Pagination.jsx";
 import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
-import { gradeOptions } from "../../data/mockData.js";
+import { gradeOptions } from "../../data/uiConstants.js";
 import { getRequests } from "../../services/requestsApi.js";
 import { canDo, getStoredUser } from "../../utils/access.js";
 import { formatDate, gradeBadge, shortId, statusBadge, statusLabels } from "../../utils/formatters.js";

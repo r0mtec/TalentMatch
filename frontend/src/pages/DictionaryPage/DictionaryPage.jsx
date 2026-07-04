@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Badge } from "../../components/ui/Badge.jsx";
 import { Button } from "../../components/ui/Button.jsx";
 import { Card } from "../../components/ui/Card.jsx";
+import { FeatureUnavailable } from "../../components/ui/FeatureUnavailable.jsx";
 import { Field, Input, Select } from "../../components/ui/Form.jsx";
 import { ConfirmModal, Modal } from "../../components/ui/Modal.jsx";
 import { Pagination, usePagination } from "../../components/ui/Pagination.jsx";
 import { DataTable, EmptyState } from "../../components/ui/Table.jsx";
 import { useToast } from "../../components/ui/Toast.jsx";
-import { technologyGroups } from "../../data/mockData.js";
-import { useMockApi } from "../../services/mockApi.js";
+import { technologyGroups } from "../../data/uiConstants.js";
 import {
   addTechnologySynonym,
   createTechnology as createBackendTechnology,
@@ -55,10 +55,10 @@ const candidateLabel = (value) => {
 export function DictionaryPage() {
   const location = useLocation();
   const unrecognizedRef = useRef(null);
-  const { technologies: mockTechnologies, createTechnology, updateTechnology, deleteTechnology, loading } = useMockApi();
   const { notify } = useToast();
   const [technologies, setTechnologies] = useState([]);
-  const [usingMockFallback, setUsingMockFallback] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
   const [apiError, setApiError] = useState("");
   const [query, setQuery] = useState("");
   const [modal, setModal] = useState(false);
@@ -67,40 +67,44 @@ export function DictionaryPage() {
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [unrecognizedTerms, setUnrecognizedTerms] = useState([]);
   const [termsLoading, setTermsLoading] = useState(false);
+  const [termsError, setTermsError] = useState("");
   const [ignoredTerms, setIgnoredTerms] = useState(readIgnoredTerms);
   const [contextTerm, setContextTerm] = useState(null);
   const [highlightUnrecognized, setHighlightUnrecognized] = useState(false);
 
   const loadUnrecognizedTerms = async () => {
     setTermsLoading(true);
+    setTermsError("");
     try {
       const result = await getUnrecognizedTerms({ status: "new", per_page: 200 });
       setUnrecognizedTerms(result.items);
-    } catch {
+    } catch (caught) {
       setUnrecognizedTerms([]);
+      setTermsError(caught.message || "Не удалось загрузить нераспознанные термины.");
     } finally {
       setTermsLoading(false);
     }
   };
 
   const loadTechnologies = async () => {
+    setLoading(true);
     setApiError("");
     try {
       const items = await getTechnologies({ include_inactive: true });
       setTechnologies(items);
-      setUsingMockFallback(false);
       await loadUnrecognizedTerms();
     } catch (caught) {
-      setTechnologies(mockTechnologies);
-      setUsingMockFallback(true);
+      setTechnologies([]);
       setUnrecognizedTerms([]);
       setApiError(caught.message || "Не удалось загрузить справочник.");
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     loadTechnologies();
-  }, [mockTechnologies]);
+  }, []);
 
   const grouped = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -125,7 +129,7 @@ export function DictionaryPage() {
     || new URLSearchParams(location.search).get("section") === "unrecognized";
 
   useEffect(() => {
-    if (!shouldFocusUnrecognized || usingMockFallback || termsLoading) return undefined;
+    if (!shouldFocusUnrecognized || apiError || termsLoading) return undefined;
     const timer = window.setTimeout(() => {
       unrecognizedRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       setHighlightUnrecognized(true);
@@ -133,7 +137,7 @@ export function DictionaryPage() {
       window.setTimeout(() => setHighlightUnrecognized(false), 1800);
     }, 80);
     return () => window.clearTimeout(timer);
-  }, [shouldFocusUnrecognized, termsLoading, usingMockFallback, visibleUnrecognizedTerms]);
+  }, [apiError, shouldFocusUnrecognized, termsLoading, visibleUnrecognizedTerms]);
 
   const openForm = (technology) => {
     setForm(technology ? { ...technology, synonyms: normalizeSynonyms(technology.synonyms), synonymDraft: "", sourceTermId: null } : { ...blank });
@@ -181,6 +185,7 @@ export function DictionaryPage() {
   const submit = async () => {
     if (!form.name.trim()) return;
     setApiError("");
+    setActionLoading(true);
     const payload = {
       ...form,
       name: form.name.trim(),
@@ -188,41 +193,39 @@ export function DictionaryPage() {
     };
     try {
       if (form.id) {
-        if (usingMockFallback) {
-          await updateTechnology(form.id, payload);
-        } else {
-          await updateBackendTechnology(form.id, payload);
-          await syncBackendSynonyms(form, payload.synonyms);
-          await loadTechnologies();
-        }
+        await updateBackendTechnology(form.id, payload);
+        await syncBackendSynonyms(form, payload.synonyms);
+        await loadTechnologies();
+      } else if (form.sourceTermId) {
+        await promoteUnrecognizedTerm(form.sourceTermId, payload);
+        await loadTechnologies();
       } else {
-        if (usingMockFallback) {
-          await createTechnology(payload);
-        } else if (form.sourceTermId) {
-          await promoteUnrecognizedTerm(form.sourceTermId, payload);
-          await loadTechnologies();
-        } else {
-          const created = await createBackendTechnology(payload);
-          await syncBackendSynonyms(created, payload.synonyms);
-          await loadTechnologies();
-        }
+        const created = await createBackendTechnology(payload);
+        await syncBackendSynonyms(created, payload.synonyms);
+        await loadTechnologies();
       }
       notify(form.sourceTermId ? "Термин добавлен в справочник." : "Технология сохранена.");
       setModal(false);
     } catch (caught) {
       setApiError(caught.message || "Не удалось сохранить технологию.");
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const remove = async () => {
-    if (usingMockFallback) {
-      await deleteTechnology(pendingDelete.id);
-    } else {
+    setActionLoading(true);
+    setApiError("");
+    try {
       await deleteBackendTechnology(pendingDelete.id);
       await loadTechnologies();
+      notify("Технология удалена.");
+      setPendingDelete(null);
+    } catch (caught) {
+      setApiError(caught.message || "Не удалось удалить технологию.");
+    } finally {
+      setActionLoading(false);
     }
-    notify("Технология удалена.");
-    setPendingDelete(null);
   };
 
   const ignoreTerm = (term) => {
@@ -237,14 +240,23 @@ export function DictionaryPage() {
     <>
       <div className="page-head">
         <div><h1>Справочник</h1><p>Технологии, группы и синонимы для сверки резюме</p></div>
-        <Button icon="bi-plus-lg" onClick={() => openForm(null)}>Добавить технологию</Button>
+        <Button icon="bi-plus-lg" disabled={loading || Boolean(apiError)} onClick={() => openForm(null)}>Добавить технологию</Button>
       </div>
       <Card>
-        {usingMockFallback ? <div className="alert warning">Справочник временно показывает локальные данные: {apiError}</div> : null}
-        <div className="filters">
-          <Input placeholder="Поиск по названию и синонимам" value={query} onChange={(event) => setQuery(event.target.value)} />
-        </div>
-        {grouped.length ? (
+        {loading ? <div className="loading-line inline">Загружаем справочник...</div> : null}
+        {apiError ? (
+          <FeatureUnavailable
+            title="Справочник технологий пока не подключён к backend."
+            endpoint="GET /api/technologies"
+            text={apiError}
+          />
+        ) : null}
+        {!apiError ? (
+          <div className="filters">
+            <Input placeholder="Поиск по названию и синонимам" value={query} onChange={(event) => setQuery(event.target.value)} />
+          </div>
+        ) : null}
+        {!loading && !apiError && grouped.length ? (
           <div className="dictionary-groups">
             {grouped.map(({ group, items }) => (
               <DictionarySection
@@ -258,9 +270,10 @@ export function DictionaryPage() {
               />
             ))}
           </div>
-        ) : <EmptyState title="Технологии не найдены" text="Добавьте новую технологию или измените поиск." />}
+        ) : null}
+        {!loading && !apiError && !grouped.length ? <EmptyState title="Технологии не найдены" text="Добавьте новую технологию или измените поиск." /> : null}
       </Card>
-      {!usingMockFallback ? (
+      {!apiError ? (
         <div id="unrecognized" ref={unrecognizedRef}>
         <span id="unrecognized-terms" className="anchor-target" aria-hidden="true" />
         <Card className={`resume-card ${highlightUnrecognized ? "highlight-card" : ""}`}>
@@ -272,7 +285,14 @@ export function DictionaryPage() {
             {termsLoading ? <Badge>Загрузка</Badge> : <Badge>{visibleUnrecognizedTerms.length}</Badge>}
           </div>
           {termsLoading ? <div className="loading-line inline">Загружаем термины...</div> : null}
-          {!termsLoading && visibleUnrecognizedTerms.length ? (
+          {termsError ? (
+            <FeatureUnavailable
+              title="Нераспознанные термины пока не подключены к backend."
+              endpoint="GET /api/unrecognized-terms"
+              text={termsError}
+            />
+          ) : null}
+          {!termsLoading && !termsError && visibleUnrecognizedTerms.length ? (
             <>
               <DataTable>
                 <thead><tr><th>Термин</th><th>Контекст</th><th>Кандидат</th><th>Дата</th><th>Действие</th></tr></thead>
@@ -304,7 +324,7 @@ export function DictionaryPage() {
               />
             </>
           ) : null}
-          {!termsLoading && !visibleUnrecognizedTerms.length ? (
+          {!termsLoading && !termsError && !visibleUnrecognizedTerms.length ? (
             <EmptyState title="Новых терминов нет" text="Когда распознаватель найдёт незнакомые слова, они появятся здесь." />
           ) : null}
         </Card>
@@ -343,7 +363,7 @@ export function DictionaryPage() {
             </div>
           </Field>
           <div className="actions-bar">
-            <Button icon="bi-check2" disabled={loading} onClick={submit}>{loading ? "Сохраняем..." : "Сохранить"}</Button>
+            <Button icon="bi-check2" disabled={actionLoading} onClick={submit}>{actionLoading ? "Сохраняем..." : "Сохранить"}</Button>
             <Button variant="ghost" onClick={() => setModal(false)}>Отмена</Button>
           </div>
         </Modal>
@@ -368,7 +388,7 @@ export function DictionaryPage() {
         <ConfirmModal
           title="Удалить технологию?"
           text={`Технология ${pendingDelete.name} будет удалена из справочника. Это действие нельзя отменить.`}
-          loading={loading}
+          loading={actionLoading}
           onCancel={() => setPendingDelete(null)}
           onConfirm={remove}
         />
