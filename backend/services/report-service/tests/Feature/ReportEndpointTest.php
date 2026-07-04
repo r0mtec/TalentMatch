@@ -17,6 +17,7 @@ class ReportEndpointTest extends TestCase
                     [
                         'requirement_text' => 'Laravel',
                         'requirement_type' => 'must',
+                        'requirement_weight' => 3,
                         'is_matched' => true,
                         'score_contribution' => 3,
                         'matched_skill' => 'Laravel',

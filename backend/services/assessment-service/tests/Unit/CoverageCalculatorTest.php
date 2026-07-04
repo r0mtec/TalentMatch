@@ -29,7 +29,7 @@ class CoverageCalculatorTest extends TestCase
         self::assertSame('skill-php', $result['requirement_results'][0]['matched_candidate_skill_id']);
     }
 
-    public function test_nice_score_is_zero_when_no_nice_requirements_exist(): void
+    public function test_nice_score_is_complete_when_no_nice_requirements_exist(): void
     {
         $result = $this->calculator()->calculate([
             'requirements' => [
@@ -41,7 +41,7 @@ class CoverageCalculatorTest extends TestCase
         ]);
 
         self::assertSame(100.0, $result['must_score']);
-        self::assertSame(0.0, $result['nice_score']);
+        self::assertSame(100.0, $result['nice_score']);
         self::assertSame(100.0, $result['total_score']);
         self::assertFalse($result['has_missing_must_requirements']);
     }

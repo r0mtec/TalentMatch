@@ -75,7 +75,7 @@ coverage = sum(weights of matched requirements) / sum(weights of all requirement
 Результат содержит:
 
 - `must_score`;
-- `nice_score`;
+- `nice_score` — если требований `nice` нет, считается `100`, потому что этот блок полностью удовлетворён по умолчанию;
 - `total_score`;
 - `has_missing_must_requirements`;
 - `grade_match_status`;
@@ -88,4 +88,3 @@ coverage = sum(weights of matched requirements) / sum(weights of all requirement
 - `matches`;
 - `does_not_match`;
 - `unknown`.
-

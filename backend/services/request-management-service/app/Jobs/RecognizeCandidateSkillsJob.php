@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Candidate;
 use App\Models\CandidateSkill;
 use App\Models\UnrecognizedTerm;
+use App\Services\AssessmentRunService;
 use App\Services\Internal\SkillRecognitionClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -18,7 +19,7 @@ class RecognizeCandidateSkillsJob implements ShouldQueue
     {
     }
 
-    public function handle(SkillRecognitionClient $client): void
+    public function handle(SkillRecognitionClient $client, AssessmentRunService $assessmentRuns): void
     {
         $candidate = Candidate::findOrFail($this->candidateId);
         $candidate->update(['recognition_status' => 'processing']);
@@ -78,6 +79,7 @@ class RecognizeCandidateSkillsJob implements ShouldQueue
                 });
         } catch (\Throwable $exception) {
             $candidate->update(['recognition_status' => 'failed']);
+            $assessmentRuns->failWaitingAssessments($candidate);
 
             throw $exception;
         }

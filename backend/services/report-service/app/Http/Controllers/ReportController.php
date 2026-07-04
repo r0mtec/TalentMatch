@@ -150,7 +150,7 @@ class ReportController extends Controller
             $rows .= '<tr>'
                 .'<td>'.$this->escape($item['requirement_text'] ?? '-').'</td>'
                 .'<td>'.$this->escape($item['requirement_type'] ?? '-').'</td>'
-                .'<td>'.$this->number($item['score_contribution'] ?? 0).'</td>'
+                .'<td>'.$this->number($item['requirement_weight'] ?? 0).'</td>'
                 .'<td>'.$this->escape($item['matched_skill'] ?? '-').'</td>'
                 .'<td>'.$this->escape($item['evidence_text'] ?? $item['comment'] ?? '-').'</td>'
                 .'</tr>';

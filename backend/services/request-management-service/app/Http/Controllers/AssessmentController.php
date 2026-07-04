@@ -4,10 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ResolvesUser;
 use App\Http\Requests\StoreAssessmentRequest;
-use App\Jobs\CalculateAssessmentJob;
 use App\Models\Assessment;
 use App\Models\Candidate;
 use App\Models\CustomerRequest;
+use App\Services\AssessmentRunService;
 use App\Services\AuditLogService;
 use App\Services\Internal\ReportClient;
 use App\Support\RussianValidation;
@@ -20,6 +20,7 @@ class AssessmentController extends Controller
     public function __construct(
         private readonly AuditLogService $auditLog,
         private readonly ReportClient $reportClient,
+        private readonly AssessmentRunService $assessmentRuns,
     )
     {
     }
@@ -47,18 +48,16 @@ class AssessmentController extends Controller
             ->max('run_number')) + 1;
 
         $candidate = Candidate::findOrFail($candidateId);
-        $canCalculateNow = $candidate->recognition_status === 'done' || $candidate->skills()->exists();
+        $status = $this->assessmentRuns->initialStatusFor($candidate);
 
         $assessment = Assessment::create([
             'request_id' => $requestId,
             'candidate_id' => $candidateId,
             'run_number' => $runNumber,
-            'status' => $canCalculateNow ? 'queued' : 'processing',
+            'status' => $status,
         ]);
 
-        if ($canCalculateNow) {
-            CalculateAssessmentJob::dispatch($assessment->id);
-        }
+        $this->assessmentRuns->dispatchIfReady($assessment, $candidate);
 
         $this->auditLog->log('assessment.started', 'assessment', $assessment->id, [
             'request_id' => $assessment->request_id,

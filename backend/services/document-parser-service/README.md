@@ -86,6 +86,8 @@
 - `docx` — через `phpoffice/phpword`;
 - `pdf` — через `smalot/pdfparser`.
 
+Перед чтением `docx` сервис нормализует пустой блок `word/styles.xml` вида `<w:rPrDefault/>`, который встречается в файлах некоторых генераторов и ломает `phpoffice/phpword`.
+
 Если файл отсутствует, пустой, поврежден, зашифрован или не дает текста, сервис возвращает `status=failed`, `plain_text=null`, технический `warning` и понятное поле `error`.
 
 Парсинг ограничен таймаутом `DOCUMENT_PARSE_TIMEOUT_SECONDS` там, где это поддерживает runtime. Полный `plain_text` не пишется в логи.
