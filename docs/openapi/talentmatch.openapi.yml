@@ -290,7 +290,7 @@ paths:
               type: object
               required: [resume]
               properties:
-                display_name: { type: string }
+                display_name: { type: string, description: "Если пусто или не передано, backend использует grade + location; если они тоже пустые, имя файла без расширения." }
                 grade: { type: string, nullable: true }
                 location: { type: string, nullable: true }
                 citizenship: { type: string, nullable: true }

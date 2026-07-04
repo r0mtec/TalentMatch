@@ -76,6 +76,22 @@ class TechnologyAndCandidateApiTest extends TestCase
         ])->assertStatus(422);
     }
 
+    public function test_candidate_upload_uses_grade_and_location_as_display_name_when_name_is_missing(): void
+    {
+        Queue::fake();
+        Storage::fake('s3');
+        config(['filesystems.default' => 's3']);
+        $token = $this->adminToken();
+
+        $this->withToken($token)->post('/api/candidates/upload', [
+            'display_name' => '   ',
+            'grade' => 'Middle',
+            'location' => 'Kazan',
+            'resume' => UploadedFile::fake()->create('resume.docx', 12, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+        ])->assertAccepted()
+            ->assertJsonPath('display_name', 'Middle Kazan');
+    }
+
     public function test_candidate_upload_rejects_file_above_limit(): void
     {
         Storage::fake('s3');
