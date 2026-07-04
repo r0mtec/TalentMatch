@@ -26,19 +26,26 @@ class TechnologyAndCandidateApiTest extends TestCase
         $token = $this->adminToken();
 
         $technologyId = $this->withToken($token)->postJson('/api/technologies', [
-            'name' => 'PostgreSQL',
-            'group_name' => 'databases',
+            'name' => 'Elasticsearch',
+            'group_name' => 'other',
         ])->assertCreated()
             ->json('id');
 
         $this->withToken($token)->postJson('/api/technologies/'.$technologyId.'/synonyms', [
-            'synonym' => 'Postgres',
+            'synonym' => 'Elastic',
         ])->assertCreated()
-            ->assertJsonPath('normalized_synonym', 'postgres');
+            ->assertJsonPath('normalized_synonym', 'elastic');
 
         $this->withToken($token)->postJson('/api/technologies/'.$technologyId.'/synonyms', [
-            'synonym' => 'postgres',
+            'synonym' => 'elastic',
         ])->assertStatus(422);
+    }
+
+    public function test_starter_technology_dictionary_is_available_after_migrations(): void
+    {
+        $this->assertDatabaseHas('technologies', ['name' => 'Laravel', 'group_name' => 'frameworks']);
+        $this->assertDatabaseHas('technologies', ['name' => 'PostgreSQL', 'group_name' => 'databases']);
+        $this->assertDatabaseHas('technology_synonyms', ['synonym' => 'Postgres', 'normalized_synonym' => 'postgres']);
     }
 
     public function test_candidate_upload_accepts_docx_metadata_and_rejects_unsupported_format(): void
@@ -86,7 +93,7 @@ class TechnologyAndCandidateApiTest extends TestCase
 
         $token = $this->adminToken();
         $admin = User::query()->where('login', 'admin')->firstOrFail();
-        $technology = Technology::create(['name' => 'Laravel', 'group_name' => 'frameworks']);
+        $technology = Technology::query()->where('name', 'Laravel')->firstOrFail();
         $request = CustomerRequest::create([
             'title' => 'Backend search',
             'position' => 'Backend developer',
@@ -120,6 +127,37 @@ class TechnologyAndCandidateApiTest extends TestCase
         Queue::assertPushed(CalculateAssessmentJob::class, fn (CalculateAssessmentJob $job) => $job->assessmentId === $assessmentId);
     }
 
+    public function test_assessment_for_failed_candidate_is_marked_failed_without_dispatching_job(): void
+    {
+        Queue::fake();
+
+        $token = $this->adminToken();
+        $admin = User::query()->where('login', 'admin')->firstOrFail();
+        $request = CustomerRequest::create([
+            'title' => 'Backend search',
+            'position' => 'Backend developer',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+        $candidate = Candidate::create([
+            'display_name' => 'Broken Resume Candidate',
+            'file_storage_key' => 'resumes/broken.docx',
+            'original_file_name' => 'broken.docx',
+            'file_mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'file_size' => 100,
+            'parsing_status' => 'failed',
+            'recognition_status' => 'failed',
+            'created_by' => $admin->id,
+        ]);
+
+        $this->withToken($token)
+            ->postJson('/api/requests/'.$request->id.'/candidates/'.$candidate->id.'/assessments')
+            ->assertAccepted()
+            ->assertJsonPath('status', 'failed');
+
+        Queue::assertNotPushed(CalculateAssessmentJob::class);
+    }
+
     public function test_assessment_payload_resolves_requirement_synonym_to_canonical_technology_name(): void
     {
         Http::fake([
@@ -141,11 +179,7 @@ class TechnologyAndCandidateApiTest extends TestCase
                 'role' => 'admin',
             ],
         );
-        $technology = Technology::create(['name' => 'PostgreSQL', 'group_name' => 'databases']);
-        $technology->synonyms()->create([
-            'synonym' => 'Postgres',
-            'normalized_synonym' => 'postgres',
-        ]);
+        $technology = Technology::query()->where('name', 'PostgreSQL')->firstOrFail();
         $request = CustomerRequest::create([
             'title' => 'Backend search',
             'position' => 'Backend developer',

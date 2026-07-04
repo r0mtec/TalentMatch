@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpWord\IOFactory;
 use Smalot\PdfParser\Parser as PdfParser;
 use Throwable;
+use ZipArchive;
 
 class DocumentParserService
 {
@@ -114,6 +115,7 @@ class DocumentParserService
     private function extractDocxText(string $path): string
     {
         try {
+            $this->normalizeDocxDefaultRunStyle($path);
             $phpWord = IOFactory::load($path);
         } catch (Throwable $exception) {
             throw new DocumentParsingException('DOCX is damaged or cannot be parsed', ['invalid_docx']);
@@ -126,6 +128,42 @@ class DocumentParserService
         }
 
         return implode("\n", array_filter($parts));
+    }
+
+    private function normalizeDocxDefaultRunStyle(string $path): void
+    {
+        if (! class_exists(ZipArchive::class)) {
+            return;
+        }
+
+        $zip = new ZipArchive();
+
+        if ($zip->open($path) !== true) {
+            return;
+        }
+
+        try {
+            $stylesXml = $zip->getFromName('word/styles.xml');
+
+            if (! is_string($stylesXml) || $stylesXml === '') {
+                return;
+            }
+
+            $normalized = preg_replace(
+                [
+                    '/<w:rPrDefault\b([^>]*)\/>/u',
+                    '/<w:rPrDefault\b([^>]*)>\s*<\/w:rPrDefault>/u',
+                ],
+                '<w:rPrDefault$1><w:rPr/></w:rPrDefault>',
+                $stylesXml,
+            ) ?? $stylesXml;
+
+            if ($normalized !== $stylesXml) {
+                $zip->addFromString('word/styles.xml', $normalized);
+            }
+        } finally {
+            $zip->close();
+        }
     }
 
     private function extractElementText(object $element): string

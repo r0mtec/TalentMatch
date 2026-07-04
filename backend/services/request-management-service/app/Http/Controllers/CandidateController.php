@@ -5,11 +5,11 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesUser;
 use App\Http\Requests\StoreCandidateSkillRequest;
 use App\Http\Requests\UploadCandidateResumeRequest;
-use App\Jobs\CalculateAssessmentJob;
 use App\Models\Assessment;
 use App\Models\Candidate;
 use App\Models\CandidateSkill;
 use App\Models\CustomerRequest;
+use App\Services\AssessmentRunService;
 use App\Services\AuditLogService;
 use App\Services\ResumeUploadService;
 use App\Support\RussianValidation;
@@ -25,6 +25,7 @@ class CandidateController extends Controller
     public function __construct(
         private readonly ResumeUploadService $resumeUploadService,
         private readonly AuditLogService $auditLog,
+        private readonly AssessmentRunService $assessmentRuns,
     )
     {
     }
@@ -215,12 +216,10 @@ class CandidateController extends Controller
             'request_id' => $requestId,
             'candidate_id' => $candidate->id,
             'run_number' => $runNumber,
-            'status' => $candidate->recognition_status === 'done' ? 'queued' : 'processing',
+            'status' => $this->assessmentRuns->initialStatusFor($candidate),
         ]);
 
-        if ($candidate->recognition_status === 'done') {
-            CalculateAssessmentJob::dispatch($assessment->id);
-        }
+        $this->assessmentRuns->dispatchIfReady($assessment, $candidate);
 
         $this->auditLog->log('assessment.started', 'assessment', $assessment->id, [
             'request_id' => $assessment->request_id,

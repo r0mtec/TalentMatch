@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Candidate;
+use App\Services\AssessmentRunService;
 use App\Services\Internal\DocumentParserClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -15,7 +16,7 @@ class ParseResumeJob implements ShouldQueue
     {
     }
 
-    public function handle(DocumentParserClient $client): void
+    public function handle(DocumentParserClient $client, AssessmentRunService $assessmentRuns): void
     {
         $candidate = Candidate::findOrFail($this->candidateId);
         $candidate->update(['parsing_status' => 'processing']);
@@ -35,7 +36,11 @@ class ParseResumeJob implements ShouldQueue
 
             RecognizeCandidateSkillsJob::dispatch($candidate->id);
         } catch (\Throwable $exception) {
-            $candidate->update(['parsing_status' => 'failed']);
+            $candidate->update([
+                'parsing_status' => 'failed',
+                'recognition_status' => 'failed',
+            ]);
+            $assessmentRuns->failWaitingAssessments($candidate);
 
             throw $exception;
         }

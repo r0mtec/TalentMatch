@@ -70,6 +70,7 @@
 
 ```text
 database/migrations/2026_01_01_000001_create_talentmatch_core_tables.php
+database/migrations/2026_01_01_000005_seed_starter_technologies.php
 ```
 
 Основные модели:
@@ -86,5 +87,6 @@ database/migrations/2026_01_01_000001_create_talentmatch_core_tables.php
 
 ## Текущее состояние
 
-Сервис реализует основные backend-сценарии через PostgreSQL, Redis Queue, MinIO и внутренние HTTP-сервисы. Справочник технологий и синонимов хранится в БД; `skill-recognition-service` получает его из `request-management-service` при распознавании.
+Сервис реализует основные backend-сценарии через PostgreSQL, Redis Queue, MinIO и внутренние HTTP-сервисы. Справочник технологий и синонимов хранится в БД; стартовый набор добавляется миграцией, а администратор может расширять его через API. `skill-recognition-service` получает справочник из `request-management-service` при распознавании.
 
+Если парсинг или распознавание резюме завершились ошибкой, новые и ожидающие `assessment` для кандидата переводятся в `failed`, чтобы они не оставались в `processing` без фоновой задачи.

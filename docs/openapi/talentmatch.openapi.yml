@@ -402,6 +402,7 @@ paths:
     post:
       tags: [Assessments]
       summary: Запустить сверку кандидата с запросом
+      description: Создаёт assessment run_number. Если кандидат уже распознан или у него есть ручные навыки, расчёт ставится в очередь. Если парсинг или распознавание кандидата завершились ошибкой, assessment сразу получает status=failed.
       requestBody:
         required: true
         content:
@@ -413,7 +414,7 @@ paths:
                 request_id: { type: string, format: uuid }
                 candidate_id: { type: string, format: uuid }
       responses:
-        "202": { description: Assessment created; calculation queued or waiting for recognition }
+        "202": { description: Assessment created; calculation queued, waiting for recognition, or marked failed for an unusable candidate }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "422": { $ref: "#/components/responses/ValidationError" }
   /assessments/{id}:
@@ -442,12 +443,12 @@ paths:
     post:
       tags: [Assessments]
       summary: Повторно прогнать ранее загруженного кандидата против запроса
-      description: Не копирует кандидата и не требует повторную загрузку файла. Создаёт новый assessment run_number; если recognition_status не done, расчёт будет поставлен после распознавания.
+      description: Не копирует кандидата и не требует повторную загрузку файла. Создаёт новый assessment run_number; если recognition_status не done, расчёт будет поставлен после распознавания. Если парсинг или распознавание кандидата завершились ошибкой, assessment сразу получает status=failed.
       parameters:
         - $ref: "#/components/parameters/Id"
         - { name: candidate_id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
-        "202": { description: Assessment created; calculation queued or waiting for recognition }
+        "202": { description: Assessment created; calculation queued, waiting for recognition, or marked failed for an unusable candidate }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
   /requests/{id}/compare-candidates:
@@ -477,6 +478,7 @@ paths:
     get:
       tags: [Technologies]
       summary: Справочник технологий
+      description: На свежей БД миграции создают стартовый набор распространённых технологий и синонимов; администратор может расширять и редактировать справочник.
       parameters:
         - { name: include_inactive, in: query, schema: { type: boolean } }
         - { name: q, in: query, schema: { type: string } }
