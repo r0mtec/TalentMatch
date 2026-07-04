@@ -49,7 +49,7 @@ class CoverageCalculator
         return [
             'status' => 'done',
             'must_score' => $this->percent($matchedMustWeight, $mustWeight),
-            'nice_score' => $this->percent($matchedNiceWeight, $niceWeight),
+            'nice_score' => $niceWeight <= 0.0 ? 100.0 : $this->percent($matchedNiceWeight, $niceWeight),
             'total_score' => $this->percent($matchedWeight, $totalWeight),
             'has_missing_must_requirements' => $matchedMustWeight < $mustWeight,
             'grade_match_status' => $this->matchStatus($conditions['request_grade'] ?? null, $conditions['candidate_grade'] ?? null),

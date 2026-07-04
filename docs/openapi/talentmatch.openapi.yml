@@ -988,7 +988,7 @@ components:
       properties:
         status: { type: string, enum: [done, failed] }
         must_score: { type: number }
-        nice_score: { type: number }
+        nice_score: { type: number, description: "Если nice requirements отсутствуют, возвращается 100." }
         total_score: { type: number }
         has_missing_must_requirements: { type: boolean }
         grade_match_status: { type: string, enum: [matches, does_not_match, unknown] }
@@ -1038,7 +1038,7 @@ components:
         run_number: { type: integer, nullable: true }
         status: { type: string, nullable: true }
         must_score: { type: number }
-        nice_score: { type: number }
+        nice_score: { type: number, description: "Если nice requirements отсутствуют, возвращается 100." }
         total_score: { type: number }
         has_missing_must_requirements: { type: boolean }
         grade_match_status: { type: string, enum: [matches, does_not_match, unknown], nullable: true }
