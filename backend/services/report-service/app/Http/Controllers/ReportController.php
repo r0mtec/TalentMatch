@@ -84,9 +84,9 @@ class ReportController extends Controller
                 .'<td>'.$this->number($assessment['total_score'] ?? 0).'%</td>'
                 .'<td>'.$this->number($assessment['must_score'] ?? 0).'%</td>'
                 .'<td>'.$this->number($assessment['nice_score'] ?? 0).'%</td>'
-                .'<td>'.$this->escape($assessment['grade_match_status'] ?? 'unknown').'</td>'
-                .'<td>'.$this->escape($assessment['location_match_status'] ?? 'unknown').'</td>'
-                .'<td>'.$this->escape($assessment['citizenship_match_status'] ?? 'unknown').'</td>'
+                .'<td>'.$this->escape($this->displayValue($candidate['grade'] ?? null)).'</td>'
+                .'<td>'.$this->escape($this->displayValue($candidate['location'] ?? null)).'</td>'
+                .'<td>'.$this->escape($this->displayValue($candidate['citizenship'] ?? null)).'</td>'
                 .'</tr>';
         }
 
@@ -131,9 +131,9 @@ class ReportController extends Controller
                 <div><strong>Must процент:</strong> '.$this->number($assessment['must_score'] ?? 0).'%</div>
                 <div><strong>Nice процент:</strong> '.$this->number($assessment['nice_score'] ?? 0).'%</div>
                 <div><strong>Есть незакрытые must:</strong> '.(($assessment['has_missing_must_requirements'] ?? false) ? 'да' : 'нет').'</div>
-                <div><strong>Грейд:</strong> '.$this->escape($assessment['grade_match_status'] ?? 'unknown').'</div>
-                <div><strong>Локация:</strong> '.$this->escape($assessment['location_match_status'] ?? 'unknown').'</div>
-                <div><strong>Гражданство:</strong> '.$this->escape($assessment['citizenship_match_status'] ?? 'unknown').'</div>
+                <div><strong>Грейд кандидата:</strong> '.$this->escape($this->displayValue($candidate['grade'] ?? null)).'</div>
+                <div><strong>Локация кандидата:</strong> '.$this->escape($this->displayValue($candidate['location'] ?? null)).'</div>
+                <div><strong>Гражданство кандидата:</strong> '.$this->escape($this->displayValue($candidate['citizenship'] ?? null)).'</div>
             </div>
         ';
     }
@@ -204,5 +204,16 @@ class ReportController extends Controller
     private function number(mixed $value): string
     {
         return rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
+    }
+
+    private function displayValue(mixed $value): string
+    {
+        if (! is_string($value) && ! is_numeric($value)) {
+            return '-';
+        }
+
+        $value = trim((string) $value);
+
+        return $value === '' ? '-' : $value;
     }
 }
