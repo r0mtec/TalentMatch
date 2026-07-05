@@ -82,12 +82,44 @@ class DocumentParserServiceTest extends TestCase
         $this->assertStringContainsString('PostgreSQL', $result['plain_text']);
     }
 
+    public function test_it_extracts_candidate_conditions_from_docx_text(): void
+    {
+        if (! class_exists(ZipArchive::class)) {
+            $this->markTestSkipped('ZipArchive is required to build the DOCX fixture.');
+        }
+
+        Storage::fake('local');
+        config(['filesystems.default' => 'local']);
+        Storage::disk('local')->put('resume.docx', $this->minimalDocxWithText([
+            'Grade: Senior',
+            'Location: Kazan',
+            'Citizenship: RU',
+            'Laravel PostgreSQL Docker',
+        ]));
+
+        $result = $this->parser()->parse([
+            'candidate_id' => '11111111-1111-4111-8111-111111111111',
+            'file_storage_key' => 'resume.docx',
+            'file_mime_type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'original_file_name' => 'resume.docx',
+        ]);
+
+        $this->assertSame('Senior', $result['sections']['grade']);
+        $this->assertSame('Kazan', $result['sections']['location']);
+        $this->assertSame('RU', $result['sections']['citizenship']);
+    }
+
     private function parser(): DocumentParserService
     {
         return new DocumentParserService();
     }
 
     private function minimalDocxWithEmptyDefaultRunStyle(): string
+    {
+        return $this->minimalDocxWithText(['Laravel PostgreSQL Docker']);
+    }
+
+    private function minimalDocxWithText(array $paragraphs): string
     {
         $path = tempnam(sys_get_temp_dir(), 'empty_rpr_docx_');
         $zip = new ZipArchive();
@@ -119,14 +151,19 @@ XML);
   </w:docDefaults>
 </w:styles>
 XML);
-        $zip->addFromString('word/document.xml', <<<'XML'
+        $body = '';
+        foreach ($paragraphs as $paragraph) {
+            $body .= '<w:p><w:r><w:t>'.htmlspecialchars($paragraph, ENT_XML1 | ENT_COMPAT, 'UTF-8').'</w:t></w:r></w:p>'."\n";
+        }
+
+        $zip->addFromString('word/document.xml', str_replace('__BODY__', $body, <<<'XML'
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
-    <w:p><w:r><w:t>Laravel PostgreSQL Docker</w:t></w:r></w:p>
+    __BODY__
   </w:body>
 </w:document>
-XML);
+XML));
         $zip->close();
 
         $contents = file_get_contents($path);

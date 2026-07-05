@@ -110,7 +110,7 @@ class CandidateController extends Controller
                 continue;
             }
 
-            $candidate = $this->resumeUploadService->store($common + ['resume' => $file], $this->currentUserId());
+            $candidate = $this->resumeUploadService->store($this->candidateUploadData($common, $file), $this->currentUserId());
             $assessment = isset($common['request_id'])
                 ? $this->createAssessmentFor($common['request_id'], $candidate)
                 : null;
@@ -136,6 +136,17 @@ class CandidateController extends Controller
         ], $this->currentUserId());
 
         return response()->json(['candidates' => $created, 'errors' => $errors], 202);
+    }
+
+    private function candidateUploadData(array $common, UploadedFile $file): array
+    {
+        $data = $common + ['resume' => $file];
+
+        if (isset($common['request_id'])) {
+            unset($data['grade'], $data['location'], $data['citizenship']);
+        }
+
+        return $data;
     }
 
     public function show(Candidate $candidate)
