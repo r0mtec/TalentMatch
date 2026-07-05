@@ -75,6 +75,15 @@ const normalizeAssessmentStatus = (status, hasScores) => {
   return hasScores ? "calculated" : "processing";
 };
 
+export const normalizeRequirementType = (type) => {
+  const normalized = String(type || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+  if (["must", "must_have", "musthave"].includes(normalized)) return "must";
+  if (["nice", "nice_to_have", "nicetohave"].includes(normalized)) return "nice";
+  return "";
+};
+
+const normalizeMatchedFlag = (value) => value === true || value === 1 || value === "1" || value === "true";
+
 const requirementResultKeys = (item) => [
   item.resultId ? `result:${item.resultId}` : "",
   item.requirementId ? `requirement:${item.requirementId}:${item.matchedCandidateSkillId || ""}:${item.isMatched}` : "",
@@ -96,19 +105,23 @@ const mapRequirementResult = (result) => {
   const technology = requirement.technology || {};
   const requirementId = requirement.id || result.requirement_id;
   const resultId = result.id || result.assessment_requirement_result_id;
+  const rawType = requirement.type || result.requirement_type || result.requirementType || result.type;
+  const type = normalizeRequirementType(rawType) || "must";
+  const matchedValue = result.is_matched ?? result.isMatched ?? result.matched;
+  const isMatched = normalizeMatchedFlag(matchedValue);
   return {
-    id: resultId || requirementId || `${requirement.raw_text || technology.name || result.comment || "requirement"}-${Boolean(result.is_matched)}`,
+    id: resultId || requirementId || `${requirement.raw_text || technology.name || result.comment || "requirement"}-${isMatched}`,
     resultId,
     requirementId,
     matchedCandidateSkillId: result.matched_candidate_skill_id || result.matchedCandidateSkillId || result.matched_skill?.id || result.matchedSkill?.id || null,
-    title: requirement.raw_text || requirement.title || technology.name || result.comment || "Требование",
-    raw_text: requirement.raw_text || "",
+    title: result.requirement_text || result.requirementText || requirement.raw_text || requirement.title || technology.name || result.comment || "Требование",
+    raw_text: result.requirement_text || requirement.raw_text || "",
     technologyId: requirement.technology_id || technology.id || null,
     technology_id: requirement.technology_id || technology.id || null,
-    type: requirement.type || result.type || "must",
-    weight: Number(requirement.weight || 1),
-    isMatched: Boolean(result.is_matched),
-    evidenceText: result.evidence_text || result.matched_skill?.evidence_text || result.matchedSkill?.sourceText || "",
+    type,
+    weight: Number(result.requirement_weight || result.requirementWeight || requirement.weight || 1),
+    isMatched,
+    evidenceText: result.evidence_text || result.evidenceText || result.matched_skill?.evidence_text || result.matchedSkill?.evidence_text || result.matchedSkill?.sourceText || "",
     scoreContribution: Number(result.score_contribution || 0),
   };
 };
@@ -124,7 +137,7 @@ export function mapBackendAssessmentToFrontend(payload) {
   const normalizedResults = dedupeRequirementResults(results.map(mapRequirementResult));
   const closedRequirements = normalizedResults.filter((item) => item.isMatched);
   const missingRequirements = normalizedResults.filter((item) => !item.isMatched);
-  const missingMustRequirements = missingRequirements.filter((item) => item.type === "must");
+  const missingMustRequirements = missingRequirements.filter((item) => normalizeRequirementType(item.type) === "must");
   const status = normalizeAssessmentStatus(assessment?.status, hasScores);
   const isCalculated = Boolean(status === "calculated" || assessment?.calculated_at || assessment?.calculatedAt || normalizedResults.length);
   const hasMissingMustRequirements = Boolean(

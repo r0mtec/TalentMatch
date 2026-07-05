@@ -10,6 +10,7 @@ import { useToast } from "../../components/ui/Toast.jsx";
 import { gradeOptions } from "../../data/uiConstants.js";
 import { getAssessmentById, getAssessmentsByRequest, runAssessmentForRequestCandidate } from "../../services/assessmentsApi.js";
 import { createCandidateSkill, deleteCandidateSkill, getCandidateById, updateCandidate } from "../../services/candidatesApi.js";
+import { normalizeRequirementType } from "../../services/mappers/candidateMapper.js";
 import { downloadAssessmentReport } from "../../services/reportsApi.js";
 import { getRequests } from "../../services/requestsApi.js";
 import { getUnrecognizedTerms } from "../../services/technologiesApi.js";
@@ -153,16 +154,24 @@ export function CandidateCardPage() {
   const sourceByRequirement = useMemo(() => {
     if (!assessment) return {};
     const map = {};
-    assessment.closedRequirements.forEach((requirement) => {
+    (assessment.requirementResults || []).filter((requirement) => requirement.isMatched).forEach((requirement) => {
       const skill = recognizedSkills.find((item) =>
         item.technologyId === requirement.technologyId
         || item.technology_id === requirement.technology_id
         || String(item.title || "").toLowerCase() === String(requirement.title || "").toLowerCase(),
       );
-      map[requirement.id] = requirement.evidenceText || skill?.sourceText || "Фрагмент резюме пока не найден.";
+      map[requirement.id] = requirement.evidenceText || skill?.sourceText || "Контекст для совпадения не передан backend.";
     });
     return map;
   }, [assessment, recognizedSkills]);
+
+  const assessmentRequirementGroups = useMemo(() => {
+    const results = assessment?.requirementResults || [];
+    return {
+      must: results.filter((item) => normalizeRequirementType(item.type) === "must"),
+      nice: results.filter((item) => normalizeRequirementType(item.type) === "nice"),
+    };
+  }, [assessment]);
 
   const reload = () => setReloadKey((value) => value + 1);
 
@@ -513,38 +522,32 @@ export function CandidateCardPage() {
         )}
       </Card>
       {assessment && assessmentReady ? (
-        <div className="two-col">
-          <Card>
-            <h2>Закрытые требования</h2>
-            {assessment.closedRequirements.length ? (
-              <div className="requirement-list">
-                {assessment.closedRequirements.map((item) => (
-                  <div key={item.id} className="check-item success">
-                    <span>✓ {item.title}</span>
-                    <Button variant="ghost" onClick={() => setInfoId(infoId === item.id ? null : item.id)}>i</Button>
-                    {infoId === item.id ? <p className="source-text">{sourceByRequirement[item.id]}</p> : null}
-                  </div>
-                ))}
-              </div>
-            ) : <EmptyState title="Нет закрытых требований" text="Для этой оценки пока нет совпавших требований." />}
-          </Card>
-          <Card>
-            <h2>Отсутствующие требования</h2>
-            {assessment.missingRequirements.length ? (
-              <div className="requirement-list">
-                {assessment.missingRequirements.map((item) => <div key={item.id} className="check-item danger">× {item.title}</div>)}
-              </div>
-            ) : <EmptyState title="Нет детализации" text="Для этой оценки пока нет списка отсутствующих требований." />}
-          </Card>
+        <div className="assessment-requirements-grid">
+          <AssessmentRequirementBlock
+            title="Обязательные (Must have)"
+            tone="must"
+            items={assessmentRequirementGroups.must}
+            infoId={infoId}
+            sourceByRequirement={sourceByRequirement}
+            onToggleInfo={setInfoId}
+          />
+          <AssessmentRequirementBlock
+            title="Желательные (Nice to have)"
+            tone="nice"
+            items={assessmentRequirementGroups.nice}
+            infoId={infoId}
+            sourceByRequirement={sourceByRequirement}
+            onToggleInfo={setInfoId}
+          />
         </div>
       ) : processingUi ? (
-        <div className="two-col">
-          <Card>
-            <h2>Закрытые требования</h2>
+        <div className="assessment-requirements-grid">
+          <Card className="requirement-block must">
+            <h2>Обязательные (Must have)</h2>
             <SkeletonList title="Сверяем требования с навыками" />
           </Card>
-          <Card>
-            <h2>Отсутствующие требования</h2>
+          <Card className="requirement-block nice">
+            <h2>Желательные (Nice to have)</h2>
             <SkeletonList title="Детализация появится после расчёта" />
           </Card>
         </div>
@@ -589,6 +592,62 @@ export function CandidateCardPage() {
         </Modal>
       ) : null}
     </>
+  );
+}
+
+function AssessmentRequirementBlock({ title, tone, items, infoId, sourceByRequirement, onToggleInfo }) {
+  return (
+    <Card className={`requirement-block assessment-requirement-card ${tone}`}>
+      <div className="section-head">
+        <h2>{title}</h2>
+        <Badge>{items.length}</Badge>
+      </div>
+      {items.length ? (
+        <div className="assessment-requirement-list">
+          {items.map((item) => (
+            <AssessmentRequirementRow
+              key={item.id}
+              item={item}
+              evidenceText={sourceByRequirement[item.id]}
+              open={infoId === item.id}
+              onToggle={() => onToggleInfo(infoId === item.id ? null : item.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="Требований нет" text="Backend не вернул требования этого типа для оценки." />
+      )}
+    </Card>
+  );
+}
+
+function AssessmentRequirementRow({ item, evidenceText, open, onToggle }) {
+  const matched = Boolean(item.isMatched);
+  return (
+    <div className={`assessment-requirement-row ${matched ? "matched" : "missing"}`}>
+      <div className="assessment-requirement-main">
+        <span className="assessment-requirement-status" aria-hidden="true">
+          <i className={`bi ${matched ? "bi-check-circle-fill" : "bi-x-circle-fill"}`} />
+        </span>
+        <span className="requirement-title">{item.title}</span>
+      </div>
+      {matched ? (
+        <Button
+          variant="ghost"
+          className="icon-only assessment-requirement-info"
+          aria-label={`Показать контекст требования ${item.title}`}
+          title="Показать evidence/context"
+          onClick={onToggle}
+        >
+          <i className="bi bi-info-circle" aria-hidden="true" />
+        </Button>
+      ) : (
+        <span className="assessment-requirement-missing-hint" title="Требование не найдено в резюме">
+          <i className="bi bi-dash-circle" aria-hidden="true" />
+        </span>
+      )}
+      {matched && open ? <p className="assessment-evidence">{evidenceText || "Контекст для совпадения не передан backend."}</p> : null}
+    </div>
   );
 }
 
