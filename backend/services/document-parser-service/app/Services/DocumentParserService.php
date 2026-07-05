@@ -219,6 +219,7 @@ class DocumentParserService
             'experience' => null,
             'grade' => null,
             'location' => null,
+            'citizenship' => null,
             'languages' => null,
         ];
         $headingMap = [
@@ -254,11 +255,18 @@ class DocumentParserService
         }
 
         $sections['grade'] = $this->firstPattern($plainText, [
-            '/\b(junior|middle|senior|lead|principal)\b/iu',
+            '/(?:grade|level|грейд|уровень)\s*:?\s*(junior|middle|mid|senior|lead|principal|джуниор|мидл|сеньор|лид)\b/iu',
+            '/\b(junior|middle|mid|senior|lead|principal)\b/iu',
             '/\b(джуниор|мидл|сеньор|лид)\b/iu',
         ]);
         $sections['location'] = $this->firstPattern($plainText, [
-            '/(?:location|локация|город)\s*:?\s*([^\n,;]+)/iu',
+            '/(?:location|локация|город|местоположение|проживание|адрес)\s*:?\s*([^\n,;]+)/iu',
+            '/(?:based in|living in)\s+([^\n,;]+)/iu',
+        ]);
+        $sections['citizenship'] = $this->firstPattern($plainText, [
+            '/(?:citizenship|nationality|гражданство)\s*:?\s*([^\n,;]+)/iu',
+            '/(?:citizen of)\s+([^\n,;]+)/iu',
+            '/(?:гражданин|гражданка)\s+([^\n,;]+)/iu',
         ]);
 
         return $sections;

@@ -92,6 +92,42 @@ class TechnologyAndCandidateApiTest extends TestCase
             ->assertJsonPath('display_name', 'Middle Kazan');
     }
 
+    public function test_batch_upload_with_request_id_does_not_copy_request_conditions_to_candidate(): void
+    {
+        Queue::fake();
+        Storage::fake('s3');
+        config(['filesystems.default' => 's3']);
+        $token = $this->adminToken();
+        $admin = User::query()->where('login', 'admin')->firstOrFail();
+        $request = CustomerRequest::create([
+            'title' => 'Backend search',
+            'position' => 'Backend developer',
+            'grade' => 'Lead',
+            'location' => 'Remote',
+            'citizenship' => 'RU',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+
+        $this->withToken($token)->post('/api/candidates/batch-upload', [
+            'request_id' => $request->id,
+            'grade' => $request->grade,
+            'location' => $request->location,
+            'citizenship' => $request->citizenship,
+            'resumes' => [
+                UploadedFile::fake()->create(
+                    'resume.docx',
+                    12,
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                ),
+            ],
+        ])->assertAccepted()
+            ->assertJsonPath('candidates.0.candidate.grade', null)
+            ->assertJsonPath('candidates.0.candidate.location', null)
+            ->assertJsonPath('candidates.0.candidate.citizenship', null)
+            ->assertJsonPath('candidates.0.assessment.request_id', $request->id);
+    }
+
     public function test_candidate_upload_rejects_file_above_limit(): void
     {
         Storage::fake('s3');

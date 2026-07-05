@@ -29,6 +29,7 @@ class ParseResumeJob implements ShouldQueue
                 'parsed_text' => $result['plain_text'] ?? '',
                 'grade' => $candidate->grade ?: ($sections['grade'] ?? null),
                 'location' => $candidate->location ?: ($sections['location'] ?? null),
+                'citizenship' => $candidate->citizenship ?: ($sections['citizenship'] ?? null),
                 'languages' => $candidate->languages ?: ($sections['languages'] ?? null),
                 'parsing_status' => 'parsed',
                 'recognition_status' => 'pending',
