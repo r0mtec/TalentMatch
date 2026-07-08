@@ -67,7 +67,7 @@ export function RequestsPage() {
         <div><h1>Запросы</h1><p>Создание и управление требованиями заказчика</p></div>
         {canCreateRequest ? <Button icon="bi-plus-lg" onClick={() => navigate("/requests/new")}>Создать запрос</Button> : null}
       </div>
-      <Card>
+      <Card className="requests-card">
         <div className="filters request-filters">
           <Dropdown label="Грейд" options={gradeOptions} selected={grades} onChange={setGrades} />
           <Dropdown label="Статус" options={statusFilterOptions} selected={statuses} onChange={setStatuses} />
@@ -84,11 +84,14 @@ export function RequestsPage() {
         {loading ? <div className="loading-line inline">Загружаем запросы...</div> : null}
         {!loading && filtered.length ? (
           <DataTable>
-            <thead><tr><th>ID</th><th>Должность</th><th>Грейд</th><th>Дата создания</th><th>Статус</th><th>Действия</th></tr></thead>
+            <thead><tr><th>ID</th><th>Компания</th><th>Должность</th><th>Грейд</th><th>Дата создания</th><th>Статус</th><th>Действия</th></tr></thead>
             <tbody>
               {pagination.pageItems.map((request) => (
                 <tr key={request.id}>
                   <td>{shortId(request.id)}</td>
+                  <td className="request-company-cell">
+                    <span className="request-company-text" title={request.companyName}>{request.companyName || "Не указана"}</span>
+                  </td>
                   <td className="entity-name">{request.position}</td>
                   <td><Badge tone={gradeBadge(request.grade)}>{request.grade}</Badge></td>
                   <td>{formatDate(request.createdAt)}</td>

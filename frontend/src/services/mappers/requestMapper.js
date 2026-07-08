@@ -1,5 +1,6 @@
 ﻿const statusToBackend = { active: "active", draft: "draft", closed: "closed" };
 const statusFromBackend = { active: "active", draft: "draft", closed: "closed" };
+const missingCompanyLabel = "Не указана";
 
 export const isValidUuid = (value) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(String(value || ""));
@@ -32,9 +33,37 @@ const uniqueRequirements = (items, defaultType, requestId) => {
   }, []);
 };
 
+const normalizeCompanyName = (value) => {
+  const text = String(value || "").trim();
+  return text === missingCompanyLabel ? "" : text;
+};
+
+const companyValue = (value) => {
+  if (!value) return "";
+  if (typeof value === "object") {
+    return normalizeCompanyName(value.company_name || value.companyName || value.name || value.title || "");
+  }
+  return normalizeCompanyName(value);
+};
+
+const resolveCompanyName = (request) => [
+  request?.company_name,
+  request?.companyName,
+  request?.company,
+  request?.customer_name,
+  request?.customerName,
+  request?.customer,
+  request?.client_name,
+  request?.clientName,
+  request?.client,
+  request?.organization,
+  request?.organisation,
+].map(companyValue).find(Boolean) || "";
+
 export function mapBackendRequestToFrontend(payload) {
   const request = payload?.data || payload;
   const requirements = request?.requirements || [];
+  const companyName = resolveCompanyName(request);
   const mustHave = uniqueRequirements([
     ...(request?.must_have || []),
     ...requirements.filter((item) => item.type === "must"),
@@ -46,6 +75,7 @@ export function mapBackendRequestToFrontend(payload) {
 
   return {
     id: request?.id,
+    companyName: companyName || missingCompanyLabel,
     title: request?.title || request?.position || request?.post || "",
     position: request?.position || request?.post || request?.title || "",
     post: request?.position || request?.post || request?.title || "",
@@ -69,6 +99,7 @@ export function mapBackendRequestToFrontend(payload) {
 export function mapFrontendRequestToBackend(form, status) {
   return {
     title: form.position || form.post || form.title || "Новая заявка",
+    company_name: normalizeCompanyName(form.companyName) || null,
     position: form.position || form.post || form.title || "",
     project_description: form.description || "",
     grade: form.grade || null,
@@ -112,6 +143,7 @@ export const mapFrontendRequirementToBackend = mapRequirementToBackend;
 export function mapBackendValidationToFrontend(errors = {}) {
   const fields = {
     title: "position",
+    company_name: "companyName",
     position: "position",
     project_description: "description",
     start_date: "startDate",

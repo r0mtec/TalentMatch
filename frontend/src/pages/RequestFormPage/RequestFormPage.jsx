@@ -13,6 +13,7 @@ import { canDo, getStoredUser } from "../../utils/access.js";
 import { weightLabel } from "../../utils/formatters.js";
 
 const blankRequest = {
+  companyName: "",
   position: "",
   grade: "Middle",
   description: "",
@@ -29,6 +30,10 @@ const weightTones = { 1: "weight-low", 2: "weight-medium", 3: "weight-high", 4: 
 const localErrorFields = new Set(["grade", "mustHave", "files"]);
 
 const requirementText = (requirement) => String(requirement.raw_text || requirement.title || requirement.name || "").trim();
+const normalizeCompanyInput = (value) => {
+  const text = String(value || "").trim();
+  return text === "Не указана" ? "" : text;
+};
 
 const normalizeRequirementList = (items = []) => {
   const seen = new Set();
@@ -50,6 +55,7 @@ const normalizeRequirementList = (items = []) => {
 
 const normalizeForm = (form) => ({
   ...form,
+  companyName: normalizeCompanyInput(form.companyName),
   mustHave: normalizeRequirementList(form.mustHave),
   niceToHave: normalizeRequirementList(form.niceToHave),
 });
@@ -164,7 +170,7 @@ export function RequestFormPage() {
         const request = await getRequestById(requestId);
         if (!ignore) {
           setExisting(request);
-          setForm({ ...blankRequest, ...request });
+          setForm({ ...blankRequest, ...request, companyName: normalizeCompanyInput(request.companyName) });
         }
       } catch (caught) {
         if (!ignore) setApiError(caught.message || "Не удалось загрузить запрос.");
@@ -251,6 +257,7 @@ export function RequestFormPage() {
       <Card>
         <h2>Основная информация</h2>
         <div className="form-grid">
+          <Field label="Компания"><Input disabled={!canEditRequest} value={form.companyName} onChange={(event) => update("companyName", event.target.value)} placeholder="Например: ООО «ТехноСервис»" /></Field>
           <Field label="Должность"><Input disabled={!canEditRequest} value={form.position} onChange={(event) => update("position", event.target.value)} placeholder="Backend Developer" /></Field>
           <Field label="Грейд" error={errors.grade}><Select disabled={!canEditRequest} value={form.grade} onChange={(event) => update("grade", event.target.value)}>{gradeOptions.map((grade) => <option key={grade}>{grade}</option>)}</Select></Field>
           <Field label="Локация"><Input disabled={!canEditRequest} value={form.location} onChange={(event) => update("location", event.target.value)} placeholder="Москва / Удалённо" /></Field>

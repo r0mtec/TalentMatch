@@ -52,6 +52,9 @@ h2 { font-size: 18px; margin-bottom: 18px; font-weight: 700; }
 .data-table th { color: var(--muted); text-align: left; font-size: 13px; font-weight: 500; padding: 12px; border-bottom: 1px solid var(--line); }
 .data-table td { padding: 14px 12px; border-bottom: 1px solid #edf2f7; vertical-align: middle; font-weight: 400; }
 .entity-name { font-weight: 600; }
+.requests-card .data-table { min-width: 900px; }
+.request-company-cell { max-width: 190px; }
+.request-company-text { display: block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .table-actions, .tag-row, .add-line, .actions-bar, .section-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 10px; background: #edf2f7; color: #38506f; font-size: 13px; font-weight: 600; }
 .grade-junior { background: #e3f3ff; color: #116da6; }
