@@ -6,13 +6,7 @@ TalentMatch - учебный MVP сервиса для первичной све
 
 ## Быстрый запуск
 
-Создайте локальный env-файл:
-
-```bash
-cp .env.example .env
-```
-
-Для локальной разработки значения уже можно оставить как в примере. Для общего окружения поменяйте `APP_KEY`, `POSTGRES_PASSWORD` и `MINIO_ROOT_PASSWORD`.
+.env файл лежит в репозитории
 
 ```bash
 docker compose up --build
