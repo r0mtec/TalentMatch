@@ -15,6 +15,7 @@ class CustomerRequest extends Model
 
     protected $fillable = [
         'title',
+        'company_name',
         'position',
         'project_description',
         'grade',

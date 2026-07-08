@@ -71,6 +71,7 @@
 ```text
 database/migrations/2026_01_01_000001_create_talentmatch_core_tables.php
 database/migrations/2026_01_01_000005_seed_starter_technologies.php
+database/migrations/2026_01_01_000007_add_company_name_to_requests.php
 ```
 
 Основные модели:

@@ -32,10 +32,13 @@ class RequestController extends Controller
         $query->when($request->filled('created_to'), fn ($q) => $q->whereDate('created_at', '<=', $request->date('created_to')));
         $query->when($request->filled('q'), function ($q) use ($request): void {
             $term = '%'.$request->input('q').'%';
-            $q->where(function ($nested) use ($term): void {
-                $nested->where('title', 'ilike', $term)
-                    ->orWhere('position', 'ilike', $term)
-                    ->orWhere('project_description', 'ilike', $term);
+            $operator = $q->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
+            $q->where(function ($nested) use ($term, $operator): void {
+                $nested->where('title', $operator, $term)
+                    ->orWhere('company_name', $operator, $term)
+                    ->orWhere('position', $operator, $term)
+                    ->orWhere('project_description', $operator, $term);
             });
         });
 

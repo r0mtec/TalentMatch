@@ -49,6 +49,7 @@ class RussianValidation
             'candidate_ids' => 'кандидаты',
             'candidate_ids.*' => 'кандидат',
             'citizenship' => 'гражданство',
+            'company_name' => 'название компании',
             'confidence' => 'уверенность',
             'display_name' => 'имя кандидата',
             'evidence_text' => 'подтверждающий текст',
