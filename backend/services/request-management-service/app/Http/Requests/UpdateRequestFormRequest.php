@@ -10,6 +10,7 @@ class UpdateRequestFormRequest extends StoreRequestFormRequest
     {
         return [
             'title' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'company_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'position' => ['sometimes', 'nullable', 'string', 'max:255'],
             'project_description' => ['sometimes', 'nullable', 'string'],
             'grade' => ['sometimes', 'nullable', 'string', 'max:100'],

@@ -307,7 +307,7 @@ paths:
     post:
       tags: [Candidates]
       summary: Пакетно загрузить resume docx/pdf до 15 МБ каждое
-      description: Возвращает 202 с созданными кандидатами и ошибками по отдельным файлам. При request_id создаёт assessment run для каждого успешно загруженного кандидата.
+      description: Возвращает 202 с созданными кандидатами и ошибками по отдельным файлам. При request_id создаёт assessment run для каждого успешно загруженного кандидата. Если передан request_id, поля grade/location/citizenship из формы игнорируются для кандидата: эти значения должны прийти из резюме или ручного редактирования кандидата, иначе assessment сравнит заявку с её копией.
       requestBody:
         required: true
         content:
@@ -812,9 +812,10 @@ components:
         role: { type: string, enum: [account_manager, lead, admin] }
     CustomerRequestInput:
       type: object
-      description: "Для status=draft допускается минимальный payload без title/position/project_description/grade/location/citizenship/workload/start_date. Для status=active backend требует title, position и хотя бы одно требование у запроса. Допустимые статусы: draft, active, closed, archived."
+      description: "Для status=draft допускается минимальный payload без title/company_name/position/project_description/grade/location/citizenship/workload/start_date. Для status=active backend требует title, position и хотя бы одно требование у запроса. Допустимые статусы: draft, active, closed, archived."
       properties:
         title: { type: string, nullable: true }
+        company_name: { type: string, nullable: true }
         position: { type: string, nullable: true }
         project_description: { type: string, nullable: true }
         grade: { type: string, nullable: true }
@@ -880,6 +881,7 @@ components:
             experience: { type: string, nullable: true }
             grade: { type: string, nullable: true }
             location: { type: string, nullable: true }
+            citizenship: { type: string, nullable: true }
             languages: { type: string, nullable: true }
         warnings:
           type: array

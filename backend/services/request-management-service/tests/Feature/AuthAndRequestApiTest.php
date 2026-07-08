@@ -59,6 +59,30 @@ class AuthAndRequestApiTest extends TestCase
             ->assertJsonPath('status', 'draft');
     }
 
+    public function test_request_company_name_can_be_created_updated_and_searched(): void
+    {
+        $token = $this->adminToken();
+
+        $requestId = $this->withToken($token)->postJson('/api/requests', [
+            'status' => 'draft',
+            'title' => 'Backend search',
+            'company_name' => 'Acme Talent',
+            'position' => 'Backend developer',
+        ])->assertCreated()
+            ->assertJsonPath('company_name', 'Acme Talent')
+            ->json('id');
+
+        $this->withToken($token)->patchJson('/api/requests/'.$requestId, [
+            'company_name' => 'Globex',
+        ])->assertOk()
+            ->assertJsonPath('company_name', 'Globex');
+
+        $this->withToken($token)->getJson('/api/requests?q=Globex')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $requestId)
+            ->assertJsonPath('data.0.company_name', 'Globex');
+    }
+
     public function test_active_request_requires_required_fields_and_requirements(): void
     {
         $token = $this->adminToken();

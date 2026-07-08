@@ -22,6 +22,7 @@ class StoreRequestFormRequest extends FormRequest
 
         return [
             'title' => [Rule::requiredIf(in_array($status, $activeStatuses, true)), 'nullable', 'string', 'max:255'],
+            'company_name' => ['nullable', 'string', 'max:255'],
             'position' => [Rule::requiredIf(in_array($status, $activeStatuses, true)), 'nullable', 'string', 'max:255'],
             'project_description' => ['nullable', 'string'],
             'grade' => ['nullable', 'string', 'max:100'],
